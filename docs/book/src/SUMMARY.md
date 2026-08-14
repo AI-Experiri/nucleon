@@ -26,4 +26,4 @@
 
 - [The Fast Kernels](11-fast-kernels.md)
 - [Quantization (GGUF)](12-quantization.md)
-- [DeepSeek](13-deepseek.md)
+- [Qwen3.8, the hybrid](13-qwen38.md)

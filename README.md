@@ -61,4 +61,4 @@ visibly.
 | m1-cpu-hello | Qwen3-0.6B generates real tokens on CPU |
 | m2-metal-parity | the same on the GPU, fast |
 | m3-quant | GGUF loading and quantized inference |
-| m4-deepseek | DeepSeek-V2-Lite: MLA attention and MoE |
+| m4-qwen38 | Qwen3.8-27B: Gated DeltaNet hybrid, hybrid cache |

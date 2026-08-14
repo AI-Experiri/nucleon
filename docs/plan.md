@@ -5,8 +5,11 @@
 
 **Goal:** a pure-Rust LLM inference engine that generates real tokens from
 Qwen3-0.6B on CPU (M1), reaches GPU speed via our own Metal kernels (M2),
-runs quantized GGUF (M3), and proves the family abstraction with
-DeepSeek-V2-Lite MLA+MoE (M4).
+runs quantized GGUF (M3), and lands the flagship: Qwen3.8-27B, family
+qwen3_5 — Gated DeltaNet hybrid layers, hybrid recurrent+KV cache (M4).
+Facts: docs/research/qwen38-27b.md. DeepSeek MLA+MoE moves to the
+later-families list. bf16 Metal compute is a hard M2 requirement
+(27.8B does not fit 128 GB at f32).
 
 **Architecture:** two crates — `nucleon` (tensor, Backend trait + CpuBackend,
 loader, tokenizer, families, cache, sampler, generate, CLI) and
@@ -129,14 +132,16 @@ memory-hungry), then fused dequant-matmul kernels (fast). Runs the same
 files higgs serves.
 Proof: parity tests quant vs f32 within tolerance; golden test on a quant model.
 
-### Step 13 — DeepSeek-V2-Lite: MLA + MoE `[M4 → tag m4-deepseek]`
-`nucleon/src/families/deepseek2.rs`, `cache` gains MlaCache
-What: MLA attention with the COMPRESSED 576-dim cache + weight absorption
-(not HF's decompressed port — 9× memory difference), fp32 router, top-6
-no-renorm MoE, fused shared expert, YaRN softmax-scale correction
-(≈0.114723), interleaved-pair rope handling. Facts:
-docs/research/deepseek-v2-lite.md.
+### Step 13 — Qwen3.8-27B: the qwen3_5 hybrid family `[M4 → tag m4-qwen38]`
+`nucleon/src/families/qwen3_5.rs`, `cache` gains the recurrent+conv state
+What: Gated DeltaNet blocks (delta-rule recurrent state, short conv
+kernel 4) for 48 of 64 layers; gated GQA attention with partial RoPE
+(0.25) at head_dim 256 for the other 16; hybrid per-layer cache; mrope
+text path; MTP head and vision tower skipped. One family runs
+Qwen3.5/3.6/3.8-27B. Facts: docs/research/qwen38-27b.md.
 Proof: golden test vs HF oracle on a fixed prompt; memory ceiling check.
+(DeepSeek-V2-Lite MLA+MoE stays a later-family candidate; its research
+remains in docs/research/deepseek-v2-lite.md.)
 
 ### Step 14 — Engine API polish + higgs adapter `[M4]`
 What: the `nucleon` library facade (what higgs/jigglebot embeds):
