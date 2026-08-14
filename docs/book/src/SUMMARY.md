@@ -14,6 +14,7 @@
 
 # Part II: The engine
 
+- [The Engine](03-engine.md)
 - [The Loader](04-loader.md)
 - [The Tokenizer](05-tokenizer.md)
 - [Qwen3](07-qwen3.md)

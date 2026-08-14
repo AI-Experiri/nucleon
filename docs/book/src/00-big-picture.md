@@ -150,17 +150,17 @@ to hold in your head, connected by types too dumb to leak complexity.
 
 | Ch | Block | Covers |
 |----|-------|--------|
-| 1 | tensor | the data structure everything else uses, and first Rust |
-| 2 | gpu | the hardware: cores, memories, vendor comparison |
-| 3 | metal | writing GPU software: kernels, fusion, the trait |
-| 3 | backend | one op seam, CPU and GPU implementations behind it |
-| 4 | loader | reading config.json and safetensors |
-| 5 | tokenizer | encoding, and streaming decode without broken UTF-8 |
-| 6 | cache | KV storage, offsets, and their failure modes |
-| 7 | families/qwen3 | the full transformer forward pass |
-| 8 | sampler | greedy, temperature, top-k, top-p |
-| 9 | generate | prefill, decode, stopping, streaming |
-| 10 | cli/chat | the ChatML template and the command line |
-| 11 | fast kernels | tuning matmul and attention toward llama.cpp |
-| 12 | gguf/quant | the GGUF container and 4-bit weights |
-| 13 | deepseek2 | MLA attention and mixture-of-experts |
+| 2 | tensor | the data structure everything else uses, and first Rust |
+| 3 | gpu | the hardware: cores, memories, vendor comparison |
+| 4 | metal | writing GPU software: kernels, fusion, the Backend trait on GPU |
+| 5 | engine plan | what Part II builds, in which order, and why |
+| 6 | loader | reading config.json and safetensors |
+| 7 | tokenizer | encoding, and streaming decode without broken UTF-8 |
+| 8 | families/qwen3 | the full transformer forward pass |
+| 9 | generate | the loop with no cache: correct first, measured slow |
+| 10 | cache | KV storage as the first measured improvement |
+| 11 | sampler | greedy, temperature, top-k, top-p |
+| 12 | cli/chat | the ChatML template and the command line |
+| 13 | fast kernels | tuning matmul and attention toward llama.cpp |
+| 14 | gguf/quant | the GGUF container and 4-bit weights |
+| 15 | qwen3.8 | the qwen3_5 hybrid: Gated DeltaNet and a second cache |
