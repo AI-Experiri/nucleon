@@ -26,6 +26,9 @@ order, rule.
 - Qwen3 shipped six dense checkpoints: 0.6B, 1.7B, 4B, 8B, 14B, 32B.
   Same wiring, different numbers. (The MoE releases are a separate
   family, `qwen3_moe`, whose MLP is routed experts; not building it.)
+- Every lab ships this way: Llama 3.1 as 8B/70B/405B, Gemma 2 as
+  2B/9B/27B. One family, sizes as checkpoints. Support the family
+  once and the whole size range runs.
 
 <div class="diagram"><img src="diagrams/family-checkpoints.svg" alt="one family implementation runs six checkpoints"></div>
 
