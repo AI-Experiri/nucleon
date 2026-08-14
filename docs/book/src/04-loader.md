@@ -242,8 +242,21 @@ pub struct TokenizerData {
     pub tokens: Vec<String>,          // 151936 entries
     pub merges: Vec<(String, String)>,
     pub token_types: Vec<TokenType>,  // normal / control / unused ...
+    pub pre: String,                  // "qwen2": selects the split regex
     pub eos_token_id: u32,
 }
+```
+
+`TokenizerData`'s shape is not qwen3-specific: it is the shape of
+every byte-level BPE tokenizer (GGUF's tokenizer model "gpt2"; Llama
+3 ships the same shape, different contents). The values are Qwen3's,
+and `pre` is the one family-flavored field: it names which
+pre-tokenizer regex to build. A different tokenizer kind
+(SentencePiece, GGUF model "llama", scores instead of merges) would
+grow a variant here, the same way a second family will split
+`Qwen3Config` behind the families seam.
+
+```rust
 
 pub fn load(path: &Path) -> Result<Yamf, LoaderError>
 ```
