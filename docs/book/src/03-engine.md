@@ -1,9 +1,10 @@
 # The Engine
 
 Part I built parts: a tensor, eleven operations, two executors that
-agree. Part II assembles them into an engine that loads Qwen3-0.6B and
-generates text. This chapter is the plan: premise, package, inventory,
-order, rule.
+agree. Before assembling them into an engine, this chapter builds the
+high-level view: what a model release actually is (Qwen as the
+example), what is inside it, how the two packaging formats differ,
+which engines run all this today, and the order nucleon builds in.
 
 ## 5.1 What Part I left us
 
@@ -52,7 +53,7 @@ We pay them for two families:
 |---|---|---|
 | checkpoint we run | Qwen3-0.6B | Qwen3.8-27B, the flagship |
 | layers | 28, all GQA attention | 64: 48 Gated DeltaNet + 16 attention |
-| new ops needed | none (see 5.5) | Gated DeltaNet, hybrid cache |
+| new ops needed | none (see 5.7) | Gated DeltaNet, hybrid cache |
 | built in | this part | [Qwen3.8, the hybrid](13-qwen38.md) |
 
 Part II never touches `qwen3_5`, but it already shaped two designs:
@@ -135,7 +136,12 @@ It is also why our loader takes no defaults for required fields: with
 no standard to fall back on, a value the file does not state is an
 error, not a guess.
 
-The two weight containers this book reads:
+## 5.4 The two formats, drawn
+
+The same weights ship in two packagings, and the difference is where
+the configuration lives:
+
+<div class="diagram"><img src="diagrams/formats-layout.svg" alt="safetensors folder with sidecar jsons vs GGUF single self-describing file"></div>
 
 | | safetensors | GGUF |
 |---|---|---|
@@ -153,7 +159,25 @@ f32 at load; computing in bf16 is Part III.
 <p>GGUF comes from the llama.cpp project: one self-describing file carrying weights and all metadata as key-value pairs (dimensions, even the whole tokenizer), so nothing sits beside it. Unlike config.json, GGUF has an actual written <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">specification</a>.</p>
 </div>
 
-## 5.4 What loading requires
+## 5.5 The engine landscape
+
+The same released checkpoint gets run by very different engines.
+They differentiate on three axes: which format they read, which
+hardware they bet on, and what they optimize for.
+
+| engine | from | reads | hardware | built for |
+|---|---|---|---|---|
+| transformers | Hugging Face | safetensors | CPU, CUDA, Apple MPS | the reference: every model, correctness first, speed last |
+| llama.cpp | ggml community | GGUF | CPU, Metal, CUDA, Vulkan | runs anywhere, quantized, single binary |
+| MLX | Apple | safetensors | Apple silicon only | unified-memory-native research and local use |
+| vLLM | UC Berkeley origin | safetensors | server GPUs (CUDA, ROCm) | serving many requests at once |
+| nucleon | this book | safetensors, then GGUF | Apple silicon (CPU + Metal) | readable pure Rust, every block a lesson |
+
+Two rows explain nucleon's ancestry: llama.cpp proves a from-scratch
+engine can match the labs, and MLX proves Apple silicon rewards an
+engine built for unified memory. nucleon takes both bets in Rust.
+
+## 5.6 What loading requires
 
 The loader's contract, strict on purpose:
 
@@ -168,7 +192,7 @@ Why strict: a missing or misshapen weight does not crash a
 transformer; it generates fluent, wrong tokens. Fail at load, not
 mid-generation.
 
-## 5.5 The op inventory
+## 5.7 The op inventory
 
 One decode step of Qwen3, as operation calls (the full walk is
 [Qwen3](07-qwen3.md)'s chapter):
@@ -192,7 +216,7 @@ Checked against the trait:
   [1.3](00-big-picture.md#13-prefill-and-decode)) processes many
   tokens at once.
 
-## 5.6 The build order
+## 5.8 The build order
 
 The rule: every block lands plain and correct first; every
 optimization after that shows a before/after number on the same
@@ -221,7 +245,7 @@ The steps, each a chapter:
    residency, fused kernels, bf16 compute, quantized weights
    (Part III).
 
-## 5.7 Upcoming engine topics
+## 5.9 Upcoming engine topics
 
 Visible from here, scheduled after Parts II and III:
 

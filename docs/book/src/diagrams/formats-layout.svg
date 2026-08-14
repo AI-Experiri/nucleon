@@ -1,0 +1,53 @@
+<svg width="700" height="440" viewBox="0 0 700 440" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+
+  <!-- left: safetensors package -->
+  <rect x="30" y="34" width="290" height="350" rx="12" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5" stroke-dasharray="6 4"/>
+  <text x="175" y="60" text-anchor="middle" fill="#c0cadb" font-size="14">safetensors package (a folder)</text>
+
+  <text x="175" y="86" text-anchor="middle" font-size="12" opacity="0.8">model.safetensors</text>
+  <rect x="55" y="94" width="240" height="30" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="175" y="113" text-anchor="middle" font-size="12" fill="#c0cadb">8 bytes: header length</text>
+  <rect x="55" y="128" width="240" height="40" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="175" y="145" text-anchor="middle" font-size="12" fill="#c0cadb">JSON header: name -&gt;</text>
+  <text x="175" y="161" text-anchor="middle" font-size="12" fill="#c0cadb">dtype, shape, byte range</text>
+  <rect x="55" y="172" width="240" height="66" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="175" y="202" text-anchor="middle" font-size="12" fill="#c0cadb">raw tensor bytes (bf16)</text>
+  <text x="175" y="219" text-anchor="middle" font-size="11" opacity="0.7">311 tensors, ~1.2 GB</text>
+
+  <text x="175" y="266" text-anchor="middle" font-size="12" opacity="0.8">configuration rides beside it:</text>
+  <rect x="45" y="276" width="128" height="30" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="109" y="295" text-anchor="middle" font-size="11" fill="#f0c893">config.json</text>
+  <rect x="180" y="276" width="128" height="30" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="244" y="295" text-anchor="middle" font-size="11" fill="#f0c893">tokenizer.json</text>
+  <rect x="45" y="312" width="128" height="30" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="109" y="331" text-anchor="middle" font-size="11" fill="#f0c893">tokenizer_config</text>
+  <rect x="180" y="312" width="128" height="30" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="244" y="331" text-anchor="middle" font-size="11" fill="#f0c893">generation_config</text>
+
+  <text x="175" y="408" text-anchor="middle" font-size="12" opacity="0.75">weights file + JSON sidecars</text>
+
+  <!-- right: GGUF single file -->
+  <rect x="380" y="34" width="290" height="350" rx="12" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5" stroke-dasharray="6 4"/>
+  <text x="525" y="60" text-anchor="middle" fill="#c0cadb" font-size="14">model.gguf (one file)</text>
+
+  <rect x="405" y="80" width="240" height="30" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="525" y="99" text-anchor="middle" font-size="12" fill="#c0cadb">magic "GGUF" + version</text>
+
+  <rect x="405" y="114" width="240" height="88" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="525" y="133" text-anchor="middle" font-size="12" fill="#f0c893">metadata key-values:</text>
+  <text x="525" y="150" text-anchor="middle" font-size="11" fill="#f0c893">architecture + dimensions</text>
+  <text x="525" y="166" text-anchor="middle" font-size="11" fill="#f0c893">chat template</text>
+  <text x="525" y="182" text-anchor="middle" font-size="11" fill="#f0c893">the whole tokenizer</text>
+
+  <rect x="405" y="206" width="240" height="34" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="525" y="227" text-anchor="middle" font-size="12" fill="#c0cadb">tensor index: name, type, offset</text>
+
+  <rect x="405" y="244" width="240" height="98" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="525" y="283" text-anchor="middle" font-size="12" fill="#c0cadb">tensor data, aligned</text>
+  <text x="525" y="300" text-anchor="middle" font-size="11" opacity="0.7">usually quantized blocks</text>
+
+  <text x="525" y="408" text-anchor="middle" font-size="12" opacity="0.75">everything inside; nothing beside it</text>
+
+  <!-- shared key -->
+  <text x="350" y="432" text-anchor="middle" font-size="12" opacity="0.8">orange = configuration; blue = weights and their index</text>
+</svg>
