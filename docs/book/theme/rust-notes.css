@@ -144,3 +144,34 @@
 .content .warn p {
     margin: 0.5em 0;
 }
+
+/* Note boxes: labeled cards for origin stories and background facts
+   that support the narrative without being warnings. <div class="note">
+   in markdown; block HTML, inner markup is HTML tags, no blank lines. */
+
+.content .note {
+    position: relative;
+    padding: 2.2em 1.2em 0.6em 1.2em;
+    margin: 1.2em 0;
+    border: 1px solid rgba(94, 141, 94, 0.45);
+    border-left: 4px solid #5e8d5e;
+    border-radius: 8px;
+    background: rgba(94, 141, 94, 0.06);
+}
+
+.content .note::before {
+    content: "\270E  Note";
+    position: absolute;
+    top: 0.5em;
+    left: 1.1em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5e8d5e;
+    opacity: 0.9;
+}
+
+.content .note p {
+    margin: 0.5em 0;
+}

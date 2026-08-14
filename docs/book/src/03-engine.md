@@ -145,6 +145,11 @@ Two format words:
   (reduced-precision) weights. nucleon reads it in Part III
   ([Quantization](12-quantization.md)).
 
+<div class="note">
+<p>Where the two formats come from: safetensors is Hugging Face's own format, built in 2022 to replace pickle-based PyTorch checkpoint files, which can execute arbitrary code when loaded. Its reference implementation is written in Rust, and our loader uses that exact crate (<a href="https://huggingface.co/docs/safetensors/index">format docs</a>, <a href="https://github.com/huggingface/safetensors">source</a>).</p>
+<p>GGUF comes from the llama.cpp project: one self-describing file carrying the weights and all metadata as key-value pairs (dimensions, even the whole tokenizer), so nothing needs to sit beside it. Unlike config.json, GGUF has an actual written <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">specification</a>.</p>
+</div>
+
 One dtype word: bf16 is a 16-bit float with f32's exponent range and
 fewer fraction bits; it is what the weights are stored in. In Part II
 the loader converts bf16 to f32 once at load time and all math stays
