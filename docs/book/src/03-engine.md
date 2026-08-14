@@ -68,8 +68,10 @@ checkpoint:
 | tie_word_embeddings | true |
 
 Every number in that table is readable in the checkpoint's actual
-[config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json);
-open it once now, because the loader chapter parses exactly that file.
+[config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json)
+(or as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json),
+the exact bytes our loader will read); open it once now, because the
+loader chapter parses exactly that file.
 
 `qwen3_5` is the flagship: Qwen3.8-27B, a 64-layer hybrid that needs
 operations we have not built yet. It gets its own chapter
