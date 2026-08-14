@@ -128,3 +128,61 @@ fn attention_rejects_seq_beyond_cap() {
         .unwrap_or_default();
     assert!(msg.contains("caps seq at 4096"), "got: {msg}");
 }
+
+fn panic_message(f: impl FnOnce() + std::panic::UnwindSafe) -> String {
+    let err = std::panic::catch_unwind(f).expect_err("expected a panic");
+    err.downcast_ref::<&str>()
+        .map(|s| s.to_string())
+        .or_else(|| err.downcast_ref::<String>().cloned())
+        .unwrap_or_default()
+}
+
+#[test]
+fn guard_regressions_panic_before_the_gpu() {
+    // the wrappers are the only line between safe Rust and unchecked GPU
+    // indexing; these pin them so a guard regression cannot become OOB
+    let Some(gpu) = gpu() else { return };
+
+    let table = Tensor::zeros(vec![4, 8]);
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.embed(&table, 4); // vocab is 4, id 4 is out of range
+    }));
+    assert!(msg.contains(">= vocab"), "got: {msg}");
+
+    let q = Tensor::zeros(vec![3, 4]);
+    let kv = Tensor::zeros(vec![2, 5, 4]); // 3 heads over 2 kv heads: invalid
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.attention(&q, &kv, &kv, 1.0);
+    }));
+    assert!(msg.contains("divide evenly"), "got: {msg}");
+
+    let q = Tensor::zeros(vec![1, 0]);
+    let kv = Tensor::zeros(vec![1, 1, 0]);
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.attention(&q, &kv, &kv, 1.0);
+    }));
+    assert!(msg.contains("nonzero"), "got: {msg}");
+}
+
+#[test]
+fn zero_sized_outer_shapes_agree_across_backends() {
+    // the trait allows empty outer shapes; both executors must return
+    // the same empty results
+    let Some(gpu) = gpu() else { return };
+    let cpu = CpuBackend;
+
+    let empty = Tensor::zeros(vec![0]);
+    assert_eq!(gpu.add(&empty, &empty).len(), cpu.add(&empty, &empty).len());
+    assert_eq!(gpu.silu(&empty).len(), cpu.silu(&empty).len());
+    assert_eq!(gpu.softmax(&empty).len(), cpu.softmax(&empty).len());
+
+    let w = Tensor::zeros(vec![0, 3]); // zero output rows
+    let x = Tensor::zeros(vec![3]);
+    assert_eq!(gpu.matvec(&w, &x).len(), cpu.matvec(&w, &x).len());
+
+    let no_heads = Tensor::zeros(vec![0, 8]);
+    assert_eq!(
+        gpu.rope(&no_heads, 3, 1e6).len(),
+        cpu.rope(&no_heads, 3, 1e6).len()
+    );
+}

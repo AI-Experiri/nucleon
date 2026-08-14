@@ -268,7 +268,10 @@ impl MetalOps {
         n_kv_heads: usize,
         scale: f32,
     ) -> Vec<f32> {
-        assert!(head_dim > 0 && seq > 0 && n_heads > 0 && n_kv_heads > 0);
+        assert!(
+            head_dim > 0 && seq > 0 && n_heads > 0 && n_kv_heads > 0,
+            "attention dims must be nonzero (empty cache?)"
+        );
         assert!(seq <= 4096, "attention kernel caps seq at 4096");
         let q_elems = n_heads.checked_mul(head_dim).expect("q size overflows");
         let kv_elems = n_kv_heads

@@ -20,6 +20,9 @@ use crate::tensor::Tensor;
 ///   must be nonzero and panic otherwise.
 /// - Zero-sized OUTER shapes (empty elementwise inputs, zero output
 ///   rows) are valid and return empty results.
+/// - Dimensions near u32::MAX are out of contract: GPU index math is
+///   32-bit and backends may reject them. Real model shapes sit orders
+///   of magnitude below the cap.
 pub trait Backend {
     /// Elementwise a + b. Shapes must match.
     fn add(&self, a: &Tensor, b: &Tensor) -> Tensor;
