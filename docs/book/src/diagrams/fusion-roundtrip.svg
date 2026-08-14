@@ -1,0 +1,75 @@
+<svg width="740" height="520" viewBox="0 0 740 520" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrU" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e0a458" opacity="0.85"/>
+    </marker>
+    <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7410e" opacity="0.85"/>
+    </marker>
+  </defs>
+
+  <!-- ============ 1: composed + wait ============ -->
+  <text x="40" y="26" font-weight="bold" fill="#c0cadb">1. composed, waiting after each command (each launch)</text>
+  <text x="700" y="26" text-anchor="end" font-size="12" opacity="0.8">524.8 us/step</text>
+
+  <rect x="40" y="38" width="660" height="52" rx="8" fill="rgba(183,65,14,0.06)" stroke="#b7410e" stroke-opacity="0.4"/>
+  <text x="48" y="54" font-size="10" fill="#c98a6b">GPU core</text>
+  <rect x="40" y="100" width="660" height="38" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.5"/>
+  <text x="48" y="116" font-size="10" fill="#a9b6c6">DRAM</text>
+
+  <rect x="120" y="46" width="100" height="36" rx="6" fill="rgba(183,65,14,0.25)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="170" y="68" text-anchor="middle" font-size="12" fill="#c98a6b">rmsnorm</text>
+  <rect x="226" y="46" width="150" height="36" rx="6" fill="rgba(70,130,180,0.06)" stroke="#4682b4" stroke-opacity="0.25"/>
+  <text x="301" y="68" text-anchor="middle" font-size="11" opacity="0.65">idle: CPU round trip</text>
+  <rect x="382" y="46" width="100" height="36" rx="6" fill="rgba(183,65,14,0.25)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="432" y="68" text-anchor="middle" font-size="12" fill="#c98a6b">matvec</text>
+  <rect x="488" y="46" width="150" height="36" rx="6" fill="rgba(70,130,180,0.06)" stroke="#4682b4" stroke-opacity="0.25"/>
+  <text x="563" y="68" text-anchor="middle" font-size="11" opacity="0.65">idle: CPU round trip</text>
+
+  <rect x="250" y="104" width="100" height="30" rx="5" fill="rgba(70,130,180,0.25)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="300" y="124" text-anchor="middle" font-size="11">tmp vector</text>
+  <path d="M 200 82 C 220 94, 235 98, 258 104" stroke="#b7410e" stroke-opacity="0.8" fill="none" marker-end="url(#arrD)"/>
+  <path d="M 342 104 C 365 96, 380 92, 398 84" stroke="#b7410e" stroke-opacity="0.8" fill="none" marker-end="url(#arrD)"/>
+  <text x="655" y="128" text-anchor="middle" font-size="11" fill="#c98a6b">dips AND gaps</text>
+
+  <!-- ============ 2: composed, batched ============ -->
+  <text x="40" y="176" font-weight="bold" fill="#c0cadb">2. composed, one command buffer</text>
+  <text x="700" y="176" text-anchor="end" font-size="12" opacity="0.8">92.3 us/step</text>
+
+  <rect x="40" y="188" width="660" height="52" rx="8" fill="rgba(183,65,14,0.06)" stroke="#b7410e" stroke-opacity="0.4"/>
+  <text x="48" y="204" font-size="10" fill="#c98a6b">GPU core</text>
+  <rect x="40" y="250" width="660" height="38" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.5"/>
+  <text x="48" y="266" font-size="10" fill="#a9b6c6">DRAM</text>
+
+  <rect x="120" y="196" width="100" height="36" rx="6" fill="rgba(183,65,14,0.25)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="170" y="218" text-anchor="middle" font-size="12" fill="#c98a6b">rmsnorm</text>
+  <rect x="224" y="196" width="100" height="36" rx="6" fill="rgba(183,65,14,0.25)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="274" y="218" text-anchor="middle" font-size="12" fill="#c98a6b">matvec</text>
+  <text x="420" y="218" font-size="11" opacity="0.65">... next step follows immediately</text>
+
+  <rect x="150" y="254" width="100" height="30" rx="5" fill="rgba(70,130,180,0.25)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="200" y="274" text-anchor="middle" font-size="11">tmp vector</text>
+  <path d="M 185 232 C 190 242, 192 246, 196 254" stroke="#b7410e" stroke-opacity="0.8" fill="none" marker-end="url(#arrD)"/>
+  <path d="M 235 254 C 244 246, 248 242, 256 234" stroke="#b7410e" stroke-opacity="0.8" fill="none" marker-end="url(#arrD)"/>
+  <text x="655" y="278" text-anchor="middle" font-size="11" fill="#c98a6b">dips, no gaps</text>
+
+  <!-- ============ 3: fused ============ -->
+  <text x="40" y="326" font-weight="bold" fill="#c0cadb">3. fused, one command buffer</text>
+  <text x="700" y="326" text-anchor="end" font-size="12" opacity="0.8">80.7 us/step (best)</text>
+
+  <rect x="40" y="338" width="660" height="52" rx="8" fill="rgba(183,65,14,0.06)" stroke="#b7410e" stroke-opacity="0.4"/>
+  <text x="48" y="354" font-size="10" fill="#c98a6b">GPU core</text>
+  <rect x="40" y="400" width="660" height="38" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.5"/>
+  <text x="48" y="416" font-size="10" fill="#a9b6c6">DRAM</text>
+
+  <rect x="170" y="346" width="330" height="36" rx="6" fill="rgba(224,164,88,0.18)" stroke="#e0a458" stroke-opacity="0.7"/>
+  <text x="335" y="368" text-anchor="middle" font-size="12" fill="#f0c893">rmsnorm_matvec (one kernel)</text>
+  <path d="M 110 364 H 166" stroke="#e0a458" stroke-opacity="0.7" fill="none" marker-end="url(#arrU)"/>
+  <text x="118" y="356" font-size="11" opacity="0.8">x in</text>
+  <path d="M 504 364 H 560" stroke="#e0a458" stroke-opacity="0.7" fill="none" marker-end="url(#arrU)"/>
+  <text x="536" y="356" font-size="11" opacity="0.8">y out</text>
+  <text x="655" y="428" text-anchor="middle" font-size="11" fill="#c98a6b">no dips, no gaps</text>
+
+  <text x="370" y="472" text-anchor="middle" font-size="12" opacity="0.85">identical math in all three; removing the gaps recovers 5.8x,</text>
+  <text x="370" y="490" text-anchor="middle" font-size="12" opacity="0.85">removing the dips on top of that adds another 1.15x</text>
+</svg>

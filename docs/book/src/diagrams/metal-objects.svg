@@ -1,0 +1,41 @@
+<svg width="740" height="620" viewBox="0 0 740 620" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#8b98a9">
+
+  <!-- tree connectors: one trunk from the device, short stubs to children -->
+  <g stroke="#4682b4" stroke-opacity="0.45" fill="none">
+    <path d="M 70 86 V 402"/>
+    <path d="M 70 144 H 100"/>
+    <path d="M 70 230 H 100"/>
+    <path d="M 70 402 H 100"/>
+    <path d="M 130 258 V 316 H 160"/>
+    <path d="M 130 430 V 488 H 160"/>
+    <path d="M 190 516 V 574 H 220"/>
+  </g>
+
+  <rect x="40" y="30" width="400" height="56" rx="9" fill="rgba(70,130,180,0.22)" stroke="#4682b4"/>
+  <text x="240" y="54" text-anchor="middle" font-weight="bold" fill="#c0cadb">MTLDevice</text>
+  <text x="240" y="74" text-anchor="middle" font-size="12" opacity="0.75">"the GPU itself", created once</text>
+
+  <rect x="100" y="116" width="400" height="56" rx="9" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="300" y="140" text-anchor="middle" fill="#a9b6c6">MTLBuffer</text>
+  <text x="300" y="160" text-anchor="middle" font-size="12" opacity="0.75">unified memory the GPU may read and write</text>
+
+  <rect x="100" y="202" width="400" height="56" rx="9" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="300" y="226" text-anchor="middle" fill="#a9b6c6">MTLLibrary</text>
+  <text x="300" y="246" text-anchor="middle" font-size="12" opacity="0.75">ops.metal, compiled at startup</text>
+
+  <rect x="160" y="288" width="400" height="56" rx="9" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.7"/>
+  <text x="360" y="312" text-anchor="middle" fill="#f0c893">MTLComputePipelineState</text>
+  <text x="360" y="332" text-anchor="middle" font-size="12" opacity="0.75">one compiled kernel, ready to launch</text>
+
+  <rect x="100" y="374" width="400" height="56" rx="9" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="300" y="398" text-anchor="middle" fill="#a9b6c6">MTLCommandQueue</text>
+  <text x="300" y="418" text-anchor="middle" font-size="12" opacity="0.75">where recorded work is submitted</text>
+
+  <rect x="160" y="460" width="440" height="56" rx="9" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="380" y="484" text-anchor="middle" fill="#a9b6c6">MTLCommandBuffer</text>
+  <text x="380" y="504" text-anchor="middle" font-size="12" opacity="0.75">a batch of recorded GPU work, submitted as one unit</text>
+
+  <rect x="220" y="546" width="460" height="56" rx="9" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="450" y="570" text-anchor="middle" fill="#a9b6c6">MTLComputeCommandEncoder</text>
+  <text x="450" y="590" text-anchor="middle" font-size="12" opacity="0.75">writes kernel + buffers + thread count into the batch</text>
+</svg>

@@ -1,0 +1,83 @@
+<svg width="720" height="450" viewBox="0 0 720 450" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <text x="360" y="26" text-anchor="middle" font-weight="bold" fill="#c0cadb">tree reduction in threadgroup memory (8 lanes shown; real kernels use 256)</text>
+
+  <!-- step bands group each fold: arrows + barrier + label -->
+  <g fill="rgba(70,130,180,0.05)">
+    <rect x="36" y="84" width="648" height="64" rx="8"/>
+    <rect x="36" y="188" width="648" height="64" rx="8"/>
+    <rect x="36" y="292" width="648" height="64" rx="8"/>
+  </g>
+
+  <!-- level 0: 8 cells -->
+  <g stroke="#4682b4" stroke-opacity="0.5">
+    <rect x="60" y="48" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="124" y="48" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="188" y="48" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="252" y="48" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="316" y="48" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+    <rect x="380" y="48" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+    <rect x="444" y="48" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+    <rect x="508" y="48" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="88" y="68">s0</text><text x="152" y="68">s1</text><text x="216" y="68">s2</text><text x="280" y="68">s3</text>
+    <text x="344" y="68">s4</text><text x="408" y="68">s5</text><text x="472" y="68">s6</text><text x="536" y="68">s7</text>
+  </g>
+
+  <!-- step 1 -->
+  <g stroke="#e0a458" stroke-opacity="0.6" fill="none">
+    <path d="M 344 80 C 344 110, 110 110, 90 146"/>
+    <path d="M 408 80 C 408 112, 174 112, 154 146"/>
+    <path d="M 472 80 C 472 114, 238 114, 218 146"/>
+    <path d="M 536 80 C 536 116, 302 116, 282 146"/>
+  </g>
+  <text x="560" y="120" font-size="13" fill="#f0c893">step 1</text>
+  <text x="560" y="138" font-size="13" fill="#f0c893">s[i] += s[i+4]</text>
+  <path d="M 48 132 H 540" stroke="#8b98a9" stroke-opacity="0.35" stroke-dasharray="5 4"/>
+  <text x="48" y="126" font-size="11" opacity="0.7">barrier</text>
+
+  <!-- level 1: 4 cells -->
+  <g stroke="#4682b4" stroke-opacity="0.5">
+    <rect x="60" y="152" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="124" y="152" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="188" y="152" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+    <rect x="252" y="152" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="88" y="172">s0</text><text x="152" y="172">s1</text><text x="216" y="172">s2</text><text x="280" y="172">s3</text>
+  </g>
+
+  <!-- step 2 -->
+  <g stroke="#e0a458" stroke-opacity="0.6" fill="none">
+    <path d="M 216 184 C 216 214, 110 214, 90 250"/>
+    <path d="M 280 184 C 280 216, 174 216, 154 250"/>
+  </g>
+  <text x="560" y="224" font-size="13" fill="#f0c893">step 2</text>
+  <text x="560" y="242" font-size="13" fill="#f0c893">s[i] += s[i+2]</text>
+  <path d="M 48 236 H 540" stroke="#8b98a9" stroke-opacity="0.35" stroke-dasharray="5 4"/>
+  <text x="48" y="230" font-size="11" opacity="0.7">barrier</text>
+
+  <!-- level 2: 2 cells -->
+  <g stroke="#4682b4" stroke-opacity="0.5">
+    <rect x="60" y="256" width="56" height="32" fill="rgba(70,130,180,0.25)"/>
+    <rect x="124" y="256" width="56" height="32" fill="rgba(70,130,180,0.15)"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="88" y="276">s0</text><text x="152" y="276">s1</text>
+  </g>
+
+  <!-- step 3 -->
+  <path d="M 152 288 C 152 318, 108 318, 92 354" stroke="#e0a458" stroke-opacity="0.6" fill="none"/>
+  <text x="560" y="328" font-size="13" fill="#f0c893">step 3</text>
+  <text x="560" y="346" font-size="13" fill="#f0c893">s[0] += s[1]</text>
+  <path d="M 48 340 H 540" stroke="#8b98a9" stroke-opacity="0.35" stroke-dasharray="5 4"/>
+  <text x="48" y="334" font-size="11" opacity="0.7">barrier</text>
+
+  <!-- final -->
+  <rect x="60" y="360" width="56" height="32" rx="4" fill="rgba(224,164,88,0.25)" stroke="#e0a458"/>
+  <text x="88" y="380" text-anchor="middle" fill="#f0c893">s0</text>
+  <text x="132" y="380" font-size="12" opacity="0.85">holds the sum of all 8 lanes</text>
+
+  <text x="360" y="420" text-anchor="middle" font-size="12" opacity="0.8">halve the active lanes each step: 256 partials collapse to 1 in 8 steps,</text>
+  <text x="360" y="438" text-anchor="middle" font-size="12" opacity="0.8">with a barrier between steps so every write is visible to every thread</text>
+</svg>

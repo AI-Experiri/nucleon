@@ -1,0 +1,111 @@
+<svg width="740" height="560" viewBox="0 0 740 560" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#8b98a9">
+
+  <text x="370" y="24" text-anchor="middle" font-weight="bold" font-size="14" fill="#c0cadb">the same idea, three vendors: a repeated compute block + fast local scratch</text>
+
+  <!-- ================= NVIDIA column ================= -->
+  <rect x="20" y="44" width="224" height="420" rx="10" fill="rgba(118,185,0,0.05)" stroke="#76b900" stroke-opacity="0.55"/>
+  <text x="132" y="68" text-anchor="middle" font-weight="bold" fill="#a9c977">NVIDIA (Ada)</text>
+  <text x="132" y="86" text-anchor="middle" font-size="11" opacity="0.75">RTX 4090: 128 SMs</text>
+
+  <rect x="36" y="98" width="192" height="210" rx="8" fill="rgba(118,185,0,0.08)" stroke="#76b900" stroke-opacity="0.5"/>
+  <text x="132" y="118" text-anchor="middle" fill="#a9c977">one SM</text>
+  <g stroke="#76b900" stroke-opacity="0.4">
+    <rect x="48" y="128" width="80" height="34" fill="rgba(118,185,0,0.15)"/>
+    <rect x="136" y="128" width="80" height="34" fill="rgba(118,185,0,0.15)"/>
+    <rect x="48" y="166" width="80" height="34" fill="rgba(118,185,0,0.15)"/>
+    <rect x="136" y="166" width="80" height="34" fill="rgba(118,185,0,0.15)"/>
+  </g>
+  <text x="88" y="149" text-anchor="middle" font-size="10">32 lanes</text>
+  <text x="176" y="149" text-anchor="middle" font-size="10">32 lanes</text>
+  <text x="88" y="187" text-anchor="middle" font-size="10">32 lanes</text>
+  <text x="176" y="187" text-anchor="middle" font-size="10">32 lanes</text>
+  <text x="132" y="216" text-anchor="middle" font-size="11" opacity="0.8">4 partitions x 32 = 128</text>
+  <text x="132" y="231" text-anchor="middle" font-size="11" opacity="0.8">"CUDA cores" (FP32 lanes)</text>
+  <rect x="48" y="242" width="168" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.5"/>
+  <text x="132" y="259" text-anchor="middle" font-size="10" fill="#f0c893">shared memory: up to 100 KB</text>
+  <rect x="48" y="274" width="168" height="26" rx="5" fill="rgba(118,185,0,0.15)" stroke="#76b900" stroke-opacity="0.4"/>
+  <text x="132" y="291" text-anchor="middle" font-size="10">4 Tensor Cores (matrix HW)</text>
+
+  <text x="132" y="330" text-anchor="middle" font-size="11">batch: warp = 32 threads</text>
+  <text x="132" y="348" text-anchor="middle" font-size="11">block: up to 1024 threads</text>
+
+  <rect x="36" y="368" width="192" height="40" rx="6" fill="rgba(118,185,0,0.10)" stroke="#76b900" stroke-opacity="0.4"/>
+  <text x="132" y="385" text-anchor="middle" font-size="11">24 GB GDDR6X, 1008 GB/s</text>
+  <text x="132" y="401" text-anchor="middle" font-size="10" opacity="0.75">separate VRAM island</text>
+  <rect x="36" y="416" width="192" height="34" rx="6" fill="rgba(183,65,14,0.12)" stroke="#b7410e" stroke-opacity="0.5"/>
+  <text x="132" y="431" text-anchor="middle" font-size="10" fill="#c98a6b">fed over PCIe Gen4 x16:</text>
+  <text x="132" y="444" text-anchor="middle" font-size="10" fill="#c98a6b">32 GB/s per direction</text>
+
+  <!-- ================= AMD column ================= -->
+  <rect x="258" y="44" width="224" height="420" rx="10" fill="rgba(237,28,36,0.05)" stroke="#ed1c24" stroke-opacity="0.45"/>
+  <text x="370" y="68" text-anchor="middle" font-weight="bold" fill="#d98a8d">AMD (RDNA 3)</text>
+  <text x="370" y="86" text-anchor="middle" font-size="11" opacity="0.75">RX 7900 XTX: 48 WGPs (96 CUs)</text>
+
+  <rect x="274" y="98" width="192" height="210" rx="8" fill="rgba(237,28,36,0.07)" stroke="#ed1c24" stroke-opacity="0.4"/>
+  <text x="370" y="118" text-anchor="middle" fill="#d98a8d">one WGP (= 2 CUs)</text>
+  <g stroke="#ed1c24" stroke-opacity="0.35">
+    <rect x="286" y="128" width="80" height="34" fill="rgba(237,28,36,0.12)"/>
+    <rect x="374" y="128" width="80" height="34" fill="rgba(237,28,36,0.12)"/>
+    <rect x="286" y="166" width="80" height="34" fill="rgba(237,28,36,0.12)"/>
+    <rect x="374" y="166" width="80" height="34" fill="rgba(237,28,36,0.12)"/>
+  </g>
+  <text x="326" y="149" text-anchor="middle" font-size="10">SIMD32</text>
+  <text x="414" y="149" text-anchor="middle" font-size="10">SIMD32</text>
+  <text x="326" y="187" text-anchor="middle" font-size="10">SIMD32</text>
+  <text x="414" y="187" text-anchor="middle" font-size="10">SIMD32</text>
+  <text x="370" y="216" text-anchor="middle" font-size="11" opacity="0.8">4 SIMD32 x 32 = 128</text>
+  <text x="370" y="231" text-anchor="middle" font-size="11" opacity="0.8">"stream processors" (lanes)</text>
+  <rect x="286" y="242" width="168" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.5"/>
+  <text x="370" y="259" text-anchor="middle" font-size="10" fill="#f0c893">LDS: 128 KB (64 KB/group)</text>
+  <rect x="286" y="274" width="168" height="26" rx="5" fill="rgba(237,28,36,0.12)" stroke="#ed1c24" stroke-opacity="0.35"/>
+  <text x="370" y="291" text-anchor="middle" font-size="10">AI Accelerators (WMMA)</text>
+
+  <text x="370" y="330" text-anchor="middle" font-size="11">batch: wave32 or wave64</text>
+  <text x="370" y="348" text-anchor="middle" font-size="11">work-group stays on one WGP</text>
+
+  <rect x="274" y="368" width="192" height="40" rx="6" fill="rgba(237,28,36,0.08)" stroke="#ed1c24" stroke-opacity="0.35"/>
+  <text x="370" y="385" text-anchor="middle" font-size="11">24 GB GDDR6, 960 GB/s</text>
+  <text x="370" y="401" text-anchor="middle" font-size="10" opacity="0.75">+ 96 MB Infinity Cache</text>
+  <rect x="274" y="416" width="192" height="34" rx="6" fill="rgba(183,65,14,0.12)" stroke="#b7410e" stroke-opacity="0.5"/>
+  <text x="370" y="431" text-anchor="middle" font-size="10" fill="#c98a6b">fed over PCIe Gen4 x16:</text>
+  <text x="370" y="444" text-anchor="middle" font-size="10" fill="#c98a6b">32 GB/s per direction</text>
+
+  <!-- ================= Apple column ================= -->
+  <rect x="496" y="44" width="224" height="420" rx="10" fill="rgba(70,130,180,0.06)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="608" y="68" text-anchor="middle" font-weight="bold" fill="#a9b6c6">Apple (M-series)</text>
+  <text x="608" y="86" text-anchor="middle" font-size="11" opacity="0.75">8 to 80 GPU cores by chip</text>
+
+  <rect x="512" y="98" width="192" height="210" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="608" y="118" text-anchor="middle" fill="#a9b6c6">one GPU core</text>
+  <g stroke="#4682b4" stroke-opacity="0.45">
+    <rect x="524" y="128" width="80" height="34" fill="rgba(70,130,180,0.18)"/>
+    <rect x="612" y="128" width="80" height="34" fill="rgba(70,130,180,0.18)"/>
+    <rect x="524" y="166" width="80" height="34" fill="rgba(70,130,180,0.18)"/>
+    <rect x="612" y="166" width="80" height="34" fill="rgba(70,130,180,0.18)"/>
+  </g>
+  <text x="564" y="149" text-anchor="middle" font-size="10">32-wide</text>
+  <text x="652" y="149" text-anchor="middle" font-size="10">32-wide</text>
+  <text x="564" y="187" text-anchor="middle" font-size="10">32-wide</text>
+  <text x="652" y="187" text-anchor="middle" font-size="10">32-wide</text>
+  <text x="608" y="216" text-anchor="middle" font-size="11" opacity="0.8">simdgroups of 32; lane count</text>
+  <text x="608" y="231" text-anchor="middle" font-size="11" opacity="0.8">per core not published</text>
+  <rect x="524" y="242" width="168" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.5"/>
+  <text x="608" y="259" text-anchor="middle" font-size="10" fill="#f0c893">threadgroup memory: 32 KB</text>
+  <rect x="524" y="274" width="168" height="26" rx="5" fill="rgba(70,130,180,0.14)" stroke="#4682b4" stroke-opacity="0.4"/>
+  <text x="608" y="291" text-anchor="middle" font-size="10">matrix HW only from M5 on</text>
+
+  <text x="608" y="330" text-anchor="middle" font-size="11">batch: simdgroup = 32, always</text>
+  <text x="608" y="348" text-anchor="middle" font-size="11">threadgroup: up to 1024</text>
+
+  <rect x="512" y="368" width="192" height="40" rx="6" fill="rgba(70,130,180,0.14)" stroke="#4682b4" stroke-opacity="0.5"/>
+  <text x="608" y="385" text-anchor="middle" font-size="11">unified memory, no VRAM:</text>
+  <text x="608" y="401" text-anchor="middle" font-size="10" opacity="0.8">M2 Ultra 800 GB/s, 192 GB</text>
+  <rect x="512" y="416" width="192" height="34" rx="6" fill="rgba(70,130,180,0.18)" stroke="#4682b4" stroke-opacity="0.5"/>
+  <text x="608" y="431" text-anchor="middle" font-size="10" fill="#a9b6c6">no bus to cross:</text>
+  <text x="608" y="444" text-anchor="middle" font-size="10" fill="#a9b6c6">CPU and GPU share the pool</text>
+
+  <!-- bottom summary -->
+  <text x="370" y="496" text-anchor="middle" font-size="12" fill="#c0cadb">same shape everywhere: many identical blocks, 32-wide execution, small fast scratch per block</text>
+  <text x="370" y="516" text-anchor="middle" font-size="11" opacity="0.8">the differences that matter to an engine: where the memory IS (island vs shared pool),</text>
+  <text x="370" y="532" text-anchor="middle" font-size="11" opacity="0.8">how much scratch a group gets (100 / 64 / 32 KB), and whether matrix hardware exists</text>
+</svg>

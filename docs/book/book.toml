@@ -1,0 +1,17 @@
+[book]
+title = "nucleon — building an LLM inference engine in pure Rust"
+authors = ["bicepjai"]
+description = "A from-scratch journey: every block of an inference engine, and the Rust it teaches along the way."
+language = "en"
+src = "src"
+
+[output.html]
+smart-punctuation = false
+additional-css = ["theme/rust-notes.css"]
+additional-js = ["theme/external-links.js"]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/AI-Experiri/nucleon"
+
+[output.html.playground]
+runnable = false

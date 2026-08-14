@@ -1,0 +1,40 @@
+<svg width="720" height="330" viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.7"/>
+    </marker>
+  </defs>
+
+  <!-- center: the basic tensor -->
+  <rect x="290" y="135" width="140" height="60" rx="10" fill="rgba(70,130,180,0.22)" stroke="#4682b4"/>
+  <text x="360" y="161" text-anchor="middle" font-weight="bold" fill="#c0cadb">Tensor</text>
+  <text x="360" y="180" text-anchor="middle" font-size="11" opacity="0.8">shape + data</text>
+
+  <!-- cluster 1: zero-copy (top left) -->
+  <rect x="30" y="30" width="240" height="88" rx="10" fill="rgba(183,65,14,0.08)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="150" y="52" text-anchor="middle" font-weight="bold" fill="#c98a6b">zero-copy access</text>
+  <text x="150" y="72" text-anchor="middle" opacity="0.85">1 views  2 transpose  3 reshape</text>
+  <text x="150" y="98" text-anchor="middle" font-size="11" fill="#f0c893">teaches: references, LIFETIMES</text>
+  <path d="M 275 105 C 300 118, 310 125, 320 132" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrA)"/>
+
+  <!-- cluster 2: iteration (top right) -->
+  <rect x="450" y="30" width="240" height="88" rx="10" fill="rgba(70,130,180,0.08)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="570" y="52" text-anchor="middle" font-weight="bold" fill="#a9b6c6">iteration + transforms</text>
+  <text x="570" y="72" text-anchor="middle" opacity="0.85">4 rows()  5 map(|x| ...)</text>
+  <text x="570" y="98" text-anchor="middle" font-size="11" fill="#9fc4e8">teaches: Iterator trait, closures</text>
+  <path d="M 445 105 C 420 118, 410 125, 400 132" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrA)"/>
+
+  <!-- cluster 3: ergonomics (bottom left) -->
+  <rect x="30" y="212" width="240" height="88" rx="10" fill="rgba(70,130,180,0.08)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="150" y="234" text-anchor="middle" font-weight="bold" fill="#a9b6c6">ergonomics</text>
+  <text x="150" y="254" text-anchor="middle" opacity="0.85">6 &amp;a + &amp;b   7 t[[i, j]]</text>
+  <text x="150" y="280" text-anchor="middle" font-size="11" fill="#9fc4e8">teaches: operator traits (Add, Index)</text>
+  <path d="M 275 225 C 300 212, 310 205, 320 198" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrA)"/>
+
+  <!-- cluster 4: sharing & types (bottom right) -->
+  <rect x="450" y="212" width="240" height="88" rx="10" fill="rgba(183,65,14,0.08)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="570" y="234" text-anchor="middle" font-weight="bold" fill="#c98a6b">sharing + generic types</text>
+  <text x="570" y="254" text-anchor="middle" opacity="0.85">8 Rc/Arc  9 concat  10 Tensor&lt;T&gt;</text>
+  <text x="570" y="280" text-anchor="middle" font-size="11" fill="#f0c893">teaches: smart pointers, generics</text>
+  <path d="M 445 225 C 420 212, 410 205, 400 198" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrA)"/>
+</svg>

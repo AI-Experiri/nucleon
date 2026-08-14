@@ -1,0 +1,49 @@
+<svg width="620" height="290" viewBox="0 0 620 290" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" fill="#8b98a9">
+  <defs>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7410e" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <!-- the struct card -->
+  <rect x="24" y="24" width="330" height="230" rx="10" fill="rgba(70,130,180,0.08)" stroke="#4682b4" stroke-opacity="0.8"/>
+  <path d="M 24 60 h 330" stroke="#4682b4" stroke-opacity="0.5"/>
+  <rect x="24" y="24" width="330" height="36" rx="10" fill="rgba(70,130,180,0.22)"/>
+  <text x="189" y="48" text-anchor="middle" font-weight="bold" font-size="15" fill="#c0cadb">struct Tensor</text>
+
+  <text x="44" y="94" fill="#a9b6c6">shape: Vec&lt;usize&gt;</text>
+  <g stroke="#8b98a9" stroke-opacity="0.6">
+    <rect x="246" y="76" width="28" height="24" fill="rgba(70,130,180,0.30)"/>
+    <rect x="274" y="76" width="28" height="24" fill="rgba(70,130,180,0.30)"/>
+  </g>
+  <g text-anchor="middle" fill="#c0cadb" font-size="13">
+    <text x="260" y="93">2</text><text x="288" y="93">3</text>
+  </g>
+
+  <text x="44" y="136" fill="#a9b6c6">data: Vec&lt;f32&gt;</text>
+  <g stroke="#8b98a9" stroke-opacity="0.6">
+    <rect x="196" y="118" width="24" height="24" fill="rgba(70,130,180,0.30)"/>
+    <rect x="220" y="118" width="24" height="24" fill="rgba(70,130,180,0.30)"/>
+    <rect x="244" y="118" width="24" height="24" fill="rgba(70,130,180,0.30)"/>
+    <rect x="268" y="118" width="24" height="24" fill="rgba(183,65,14,0.30)"/>
+    <rect x="292" y="118" width="24" height="24" fill="rgba(183,65,14,0.30)"/>
+    <rect x="316" y="118" width="24" height="24" fill="rgba(183,65,14,0.30)"/>
+  </g>
+  <g text-anchor="middle" fill="#c0cadb" font-size="13">
+    <text x="208" y="135">a</text><text x="232" y="135">b</text><text x="256" y="135">c</text>
+    <text x="280" y="135">d</text><text x="304" y="135">e</text><text x="328" y="135">f</text>
+  </g>
+
+  <path d="M 40 162 h 298" stroke="#8b98a9" stroke-opacity="0.3"/>
+  <text x="44" y="192" fill="#a9b6c6">at([i, j]) -&gt; f32</text>
+  <text x="230" y="192" font-size="12" opacity="0.7">read one element</text>
+  <text x="44" y="222" fill="#a9b6c6">row(i) -&gt; &amp;[f32]</text>
+  <text x="230" y="222" font-size="12" opacity="0.7">borrow one row</text>
+
+  <!-- what it is not -->
+  <rect x="410" y="90" width="186" height="100" rx="10" fill="rgba(183,65,14,0.08)" stroke="#b7410e" stroke-opacity="0.6"/>
+  <text x="503" y="120" text-anchor="middle" font-weight="bold" fill="#c98a6b">math is NOT here</text>
+  <text x="503" y="145" text-anchor="middle" font-size="12" opacity="0.85">matmul, softmax, rope...</text>
+  <text x="503" y="165" text-anchor="middle" font-size="12" opacity="0.85">Backend, ch. 3</text>
+  <path d="M 358 139 C 380 139, 385 139, 406 139" stroke="#b7410e" stroke-opacity="0.7" fill="none" marker-end="url(#arrR)"/>
+</svg>

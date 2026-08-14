@@ -1,0 +1,115 @@
+/* Rust concept boxes: every blockquote in this book is a Rust-language
+   aside. The engine narrative is the main column; these are the labeled
+   side boxes, indented and tinted so the eye can skip or seek them. */
+
+.content blockquote {
+    position: relative;
+    margin: 1.2em 0 1.2em 12%;
+    padding: 1.4em 1em 0.6em 1em;
+    font-size: 0.88em;
+    line-height: 1.45;
+    border: 1px solid rgba(183, 65, 14, 0.35);   /* rust-orange */
+    border-left: 4px solid #b7410e;
+    border-radius: 6px;
+    background: rgba(183, 65, 14, 0.06);
+    color: inherit;
+}
+
+.content blockquote::before {
+    content: "\1F980  Rust";                      /* crab + label */
+    position: absolute;
+    top: 0.35em;
+    left: 0.9em;
+    font-size: 0.78em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #b7410e;
+    opacity: 0.9;
+}
+
+.content blockquote p {
+    margin: 0.5em 0;
+}
+
+/* several Rust notes in one blockquote: separate them a bit */
+.content blockquote p + p {
+    margin-top: 0.9em;
+}
+
+/* code inside a Rust box stays compact */
+.content blockquote code {
+    font-size: 0.95em;
+}
+
+/* narrow screens: give the indent back */
+@media (max-width: 800px) {
+    .content blockquote {
+        margin-left: 0;
+    }
+}
+
+/* Diagram panels: fenced blocks tagged ```text are diagrams, not code.
+   Styled as labeled cards (steel-blue) so they read as figures, distinct
+   from both prose and highlighted Rust/MSL code blocks. */
+
+.content pre:has(> code.language-text) {
+    position: relative;
+    padding: 2.2em 1.2em 1.0em 1.2em;
+    border: 1px solid rgba(70, 130, 180, 0.45);
+    border-left: 4px solid #4682b4;
+    border-radius: 8px;
+    background: rgba(70, 130, 180, 0.07);
+}
+
+.content pre:has(> code.language-text)::before {
+    content: "\25A6  Diagram";
+    position: absolute;
+    top: 0.5em;
+    left: 1.1em;
+    font-family: inherit;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4682b4;
+    opacity: 0.9;
+}
+
+.content pre:has(> code.language-text) > code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.82em;
+    line-height: 1.4;
+}
+
+/* SVG diagrams get the same card treatment as text diagrams */
+.content .diagram {
+    position: relative;
+    padding: 2.2em 1.2em 1.0em 1.2em;
+    margin: 1.2em 0;
+    border: 1px solid rgba(70, 130, 180, 0.45);
+    border-left: 4px solid #4682b4;
+    border-radius: 8px;
+    background: rgba(70, 130, 180, 0.07);
+}
+
+.content .diagram::before {
+    content: "\25A6  Diagram";
+    position: absolute;
+    top: 0.5em;
+    left: 1.1em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4682b4;
+    opacity: 0.9;
+}
+
+.content .diagram svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+}

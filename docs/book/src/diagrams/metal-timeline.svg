@@ -1,0 +1,39 @@
+<svg width="720" height="210" viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e0a458" opacity="0.9"/>
+    </marker>
+  </defs>
+
+  <text x="30" y="52" text-anchor="start" fill="#a9b6c6">CPU</text>
+  <g stroke="#4682b4" stroke-opacity="0.6">
+    <rect x="90" y="34" width="90" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="180" y="34" width="90" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="270" y="34" width="90" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="360" y="34" width="70" height="30" fill="rgba(224,164,88,0.25)"/>
+    <rect x="430" y="34" width="230" height="30" fill="rgba(70,130,180,0.08)"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="135" y="53">record</text>
+    <text x="225" y="53">record</text>
+    <text x="315" y="53">record</text>
+    <text x="395" y="53" fill="#f0c893">commit</text>
+    <text x="545" y="53" opacity="0.7">wait (blocked)</text>
+  </g>
+
+  <text x="30" y="132" text-anchor="start" fill="#c98a6b">GPU</text>
+  <g stroke="#b7410e" stroke-opacity="0.6">
+    <rect x="90" y="114" width="340" height="30" fill="rgba(183,65,14,0.06)"/>
+    <rect x="430" y="114" width="230" height="30" fill="rgba(183,65,14,0.25)"/>
+  </g>
+  <g text-anchor="middle" font-size="12">
+    <text x="260" y="133" opacity="0.6">idle</text>
+    <text x="545" y="133" fill="#c98a6b">run  run  run  run</text>
+  </g>
+
+  <path d="M 395 66 C 400 90, 415 104, 428 112" stroke="#e0a458" fill="none" marker-end="url(#arrT)"/>
+  <text x="340" y="94" font-size="12" fill="#f0c893">commit starts the GPU</text>
+
+  <path d="M 662 64 v 48" stroke="#8b98a9" stroke-opacity="0.6" stroke-dasharray="4 3" fill="none"/>
+  <text x="660" y="176" text-anchor="end" font-size="12" opacity="0.8">waitUntilCompleted returns here</text>
+</svg>

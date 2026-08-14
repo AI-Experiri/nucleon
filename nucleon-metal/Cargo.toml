@@ -1,0 +1,14 @@
+[package]
+name = "nucleon-metal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Apple Silicon Metal backend for nucleon (Rust host + MSL kernels)"
+
+[dependencies]
+nucleon = { path = "../nucleon" }
+objc2 = "0.6.4"
+objc2-foundation = "0.3.2"
+objc2-metal = "0.3.2"
+# objc2 / objc2-metal / objc2-foundation land in the chapter-10 deep dive
+# (pinned together — pre-1.0 breaking minors; see docs/research/rust-crates.md)

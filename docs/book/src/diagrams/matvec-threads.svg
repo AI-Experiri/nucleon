@@ -1,0 +1,75 @@
+<svg width="720" height="300" viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.7"/>
+    </marker>
+  </defs>
+
+  <text x="330" y="28" text-anchor="middle" font-weight="bold" fill="#c0cadb">matvec: one GPU thread per output row</text>
+
+  <!-- W matrix -->
+  <text x="250" y="58" text-anchor="middle" font-size="12" opacity="0.75">W  [2048 rows x 1024 cols]</text>
+  <g stroke="#4682b4" stroke-opacity="0.5">
+    <rect x="130" y="68" width="240" height="30" fill="rgba(70,130,180,0.22)"/>
+    <rect x="130" y="102" width="240" height="30" fill="rgba(70,130,180,0.16)"/>
+    <rect x="130" y="136" width="240" height="30" fill="rgba(70,130,180,0.22)"/>
+    <rect x="130" y="196" width="240" height="30" fill="rgba(70,130,180,0.16)"/>
+  </g>
+  <text x="250" y="180" text-anchor="middle" opacity="0.6">...</text>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="250" y="88">row 0</text>
+    <text x="250" y="122">row 1</text>
+    <text x="250" y="156">row 2</text>
+    <text x="250" y="216">row 2047</text>
+  </g>
+
+  <!-- threads -->
+  <g text-anchor="end" font-size="12" fill="#f0c893">
+    <text x="100" y="88">thread 0</text>
+    <text x="100" y="122">thread 1</text>
+    <text x="100" y="156">thread 2</text>
+    <text x="100" y="216">thread 2047</text>
+  </g>
+  <g stroke="#e0a458" stroke-opacity="0.7" fill="none" marker-end="url(#arrV)">
+    <path d="M 104 84 h 22"/>
+    <path d="M 104 118 h 22"/>
+    <path d="M 104 152 h 22"/>
+    <path d="M 104 212 h 22"/>
+  </g>
+
+  <!-- x vector -->
+  <text x="440" y="58" text-anchor="middle" font-size="12" opacity="0.75">x [1024]</text>
+  <rect x="415" y="68" width="50" height="158" rx="6" fill="rgba(183,65,14,0.20)" stroke="#b7410e" stroke-opacity="0.5"/>
+  <text x="440" y="152" text-anchor="middle" fill="#c98a6b">x</text>
+
+  <!-- dot + result -->
+  <g text-anchor="middle" fill="#8b98a9" font-size="12">
+    <text x="392" y="88">dot</text>
+    <text x="392" y="122">dot</text>
+    <text x="392" y="156">dot</text>
+    <text x="392" y="216">dot</text>
+  </g>
+
+  <text x="560" y="58" text-anchor="middle" font-size="12" opacity="0.75">y [2048]</text>
+  <g stroke="#4682b4" stroke-opacity="0.5">
+    <rect x="535" y="68" width="50" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="535" y="102" width="50" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="535" y="136" width="50" height="30" fill="rgba(70,130,180,0.25)"/>
+    <rect x="535" y="196" width="50" height="30" fill="rgba(70,130,180,0.25)"/>
+  </g>
+  <g text-anchor="middle" font-size="12" fill="#c0cadb">
+    <text x="560" y="88">y0</text>
+    <text x="560" y="122">y1</text>
+    <text x="560" y="156">y2</text>
+    <text x="560" y="216">y2047</text>
+  </g>
+  <g stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrV)">
+    <path d="M 469 84 h 62"/>
+    <path d="M 469 118 h 62"/>
+    <path d="M 469 152 h 62"/>
+    <path d="M 469 212 h 62"/>
+  </g>
+
+  <text x="330" y="266" text-anchor="middle" font-size="12" opacity="0.8">every thread runs the same loop: sum += w[row*1024 + j] * x[j]</text>
+  <text x="330" y="286" text-anchor="middle" font-size="12" opacity="0.8">2048 dot products happen at once; the CPU would do them one after another</text>
+</svg>

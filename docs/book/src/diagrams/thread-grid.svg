@@ -1,0 +1,47 @@
+<svg width="740" height="360" viewBox="0 0 740 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrG3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.7"/>
+    </marker>
+  </defs>
+
+  <text x="370" y="26" text-anchor="middle" font-weight="bold" fill="#c0cadb">one dispatch: a grid of 2048 threads, split into groups of 256</text>
+
+  <rect x="40" y="42" width="660" height="118" rx="10" fill="rgba(70,130,180,0.05)" stroke="#4682b4" stroke-opacity="0.6"/>
+
+  <!-- three equal group boxes -->
+  <rect x="60" y="58" width="190" height="86" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="155" y="80" text-anchor="middle" fill="#a9b6c6">threadgroup 0</text>
+  <text x="155" y="98" text-anchor="middle" font-size="12" opacity="0.75">256 threads</text>
+  <rect x="80" y="108" width="150" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.6"/>
+  <text x="155" y="125" text-anchor="middle" font-size="11" fill="#f0c893">threadgroup memory</text>
+
+  <rect x="270" y="58" width="190" height="86" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="365" y="80" text-anchor="middle" fill="#a9b6c6">threadgroup 1</text>
+  <text x="365" y="98" text-anchor="middle" font-size="12" opacity="0.75">256 threads</text>
+  <rect x="290" y="108" width="150" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.6"/>
+  <text x="365" y="125" text-anchor="middle" font-size="11" fill="#f0c893">threadgroup memory</text>
+
+  <text x="475" y="106" text-anchor="middle" font-size="18" opacity="0.6">...</text>
+
+  <rect x="490" y="58" width="190" height="86" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="585" y="80" text-anchor="middle" fill="#a9b6c6">threadgroup 7</text>
+  <text x="585" y="98" text-anchor="middle" font-size="12" opacity="0.75">256 threads</text>
+  <rect x="510" y="108" width="150" height="26" rx="5" fill="rgba(224,164,88,0.15)" stroke="#e0a458" stroke-opacity="0.6"/>
+  <text x="585" y="125" text-anchor="middle" font-size="11" fill="#f0c893">threadgroup memory</text>
+
+  <!-- rules, outside the boxes -->
+  <text x="370" y="184" text-anchor="middle" font-size="12" opacity="0.85">inside a group: threads share its memory and sync at barriers</text>
+  <text x="370" y="202" text-anchor="middle" font-size="12" fill="#c98a6b">between groups: no communication during a dispatch</text>
+
+  <!-- arrows to unified memory -->
+  <path d="M 155 214 v 30" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrG3)"/>
+  <path d="M 365 214 v 30" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrG3)"/>
+  <path d="M 585 214 v 30" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrG3)"/>
+
+  <rect x="40" y="250" width="660" height="54" rx="10" fill="rgba(70,130,180,0.22)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="370" y="273" text-anchor="middle" fill="#c0cadb">UNIFIED MEMORY (buffers)</text>
+  <text x="370" y="292" text-anchor="middle" font-size="12" opacity="0.75">every group reads and writes here; slow compared to threadgroup memory</text>
+
+  <text x="370" y="336" text-anchor="middle" font-size="12" opacity="0.8">each thread knows its place: thread_position_in_grid, thread_position_in_threadgroup</text>
+</svg>

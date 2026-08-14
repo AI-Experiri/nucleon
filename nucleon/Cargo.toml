@@ -1,0 +1,23 @@
+[package]
+name = "nucleon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Pure-Rust LLM inference engine: core (backend-agnostic)"
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+half.workspace = true
+memmap2.workspace = true
+safetensors.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokenizers.workspace = true
+
+[[bin]]
+name = "nucleon"
+path = "src/bin/nucleon.rs"
+
+[dev-dependencies]
+candle-core = "0.11.0"
