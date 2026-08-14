@@ -1,19 +1,20 @@
 # The Loader
 
 The first block of Part II. It runs once, at startup, and crosses the
-border drawn in [The Engine](03-engine.md): one GGUF file on one
-side, the engine's plain types on the other. This chapter is the
+border drawn in [Reading the Model](03-reading-the-model.md): one
+GGUF file on one side, the engine's plain types on the other. This chapter is the
 design; the build follows it. Every number below was verified against
 the real file's bytes (docs/research/gguf-qwen3.md carries the
 sources).
 
-## 6.1 The job
+## 7.1 The job
 
-<div class="diagram"><img src="diagrams/loader-border.svg" alt="one gguf file in, config struct and tensor map out; only the loader knows the format"></div>
+<div class="diagram"><img src="diagrams/loader-border.svg" alt="one gguf file in, the Yamf bundle out; only the loader knows the format"></div>
 
 - in: one file, `Qwen3-0.6B-Q8_0.gguf` (639,446,688 bytes);
-- out: a config struct of numbers, and a map from tensor name to our
-  f32 `Tensor`, every shape already checked;
+- out: the `Yamf` bundle (7.8): the family's config numbers, every
+  weight as a checked f32 `Tensor`, the tokenizer data, the compiled
+  chat template;
 - guarantee: nothing past the loader can tell how weights were
   stored. GGUF is the only format
   ([ADR 004](../decisions/004-gguf-only-engine.md)); the parser is
@@ -27,7 +28,7 @@ hf download Qwen/Qwen3-0.6B-GGUF --local-dir models/qwen3-0.6b-gguf
 
 `models/` stays out of git; unit tests never touch it.
 
-## 6.2 The container, byte by byte
+## 7.2 The container, byte by byte
 
 <div class="diagram"><img src="diagrams/gguf-bytes.svg" alt="header, metadata KVs, tensor infos, pad, tensor data; offsets relative to data start"></div>
 
@@ -65,13 +66,19 @@ The building blocks:
   and a u64 offset relative to the data region's start, which must be
   a multiple of the alignment.
 
-One version note for the error message: v1 encoded string lengths as
+A version note for the error message: v1 encoded string lengths as
 u32, v2 widened them to u64, v3 added big-endian support with
 identical structure. A big-endian file has no marker; it reveals
 itself by version reading as 50,331,648 instead of 3, and the parser
 refuses it by value.
 
-## 6.3 The metadata this file carries
+The file is read through mmap: the operating system maps it into our
+address space and pages it in as bytes are touched. The mapping is
+`unsafe` (the box is in [Metal 0](02-metal.md)) because Rust cannot
+prove the file stays unmodified while mapped; our stated invariant is
+a local file nobody rewrites mid-run. The memmap2 crate provides it.
+
+## 7.3 The metadata this file carries
 
 You can see all of this without downloading anything: Hugging Face
 parses GGUF server-side, so the
@@ -112,7 +119,7 @@ One landmine flagged now because it costs a debugging day later:
 `tokenizer.ggml.add_bos_token` is false. Qwen3 never prepends BOS;
 reading the id and "helpfully" using it changes every output.
 
-## 6.4 The tensors
+## 7.4 The tensors
 
 310 tensors: 2 global + 28 layers x 11. The 197 matmul weights are
 Q8_0; the 113 one-dimensional norm weights stay F32 (the file's own
@@ -145,7 +152,7 @@ Two traps, both fatal and both silent if missed:
    logits come from `token_embd.weight`, reused by reference, not
    copied. llama.cpp does exactly this fallback.
 
-## 6.5 Q8_0, the first quant type
+## 7.5 Q8_0, the first quant type
 
 ```text
 one block: 34 bytes, 32 values
@@ -167,9 +174,9 @@ bytes = 165,306,368, ending exactly at the next tensor's offset; the
 last tensor's end lands exactly at byte 639,446,688, the file size.
 The loader's tests pin this arithmetic.
 
-## 6.6 The config struct
+## 7.6 The config struct
 
-`Qwen3Config` is the typed twin of 6.3's metadata table: one field
+`Qwen3Config` is the typed twin of 7.3's metadata table: one field
 per key, filled at load, no JSON anywhere. Missing key, wrong type,
 or `general.architecture != "qwen3"` each refuse with a named error.
 
@@ -189,7 +196,7 @@ pub struct Qwen3Config {
 }
 ```
 
-It reaches the engine wrapped as `FamilyConfig::Qwen3` (6.8), so the
+It reaches the engine wrapped as `FamilyConfig::Qwen3` (7.8), so the
 qwen3-specific part of the bundle is exactly one enum variant, and
 nothing family-flavored leaks anywhere else.
 
@@ -198,7 +205,7 @@ nothing family-flavored leaks anywhere else.
 > returns the `Err` to the caller early. Sibling: `Option<T>` for
 > absence without an error. [The Book, ch. 9.2](https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html)
 
-## 6.7 The gate
+## 7.7 The gate
 
 The loader is the engine's gate. It runs at the very beginning, once,
 and exactly two things can come out: a complete `Yamf`, or a refusal
@@ -240,20 +247,16 @@ The contract on what a loaded model must contain:
 2. dims reversed into row-major shapes before any shape check;
 3. Q8_0 dequantized to f32 once, during the single pass over the
    mmap; F32 tensors copied straight out;
-4. logits weight = the embedding tensor, by reference (6.4 trap 2).
+4. logits weight = the embedding tensor, by reference (7.4 trap 2).
 
-mmap carries over from the safetensors design unchanged: the OS pages
-the file in as it is touched, and the mapping is `unsafe` (the box is
-in [Metal 0](02-metal.md)) because Rust cannot prove the file stays
-unmodified; our invariant is a local file nobody rewrites mid-run.
-
-## 6.8 Yamf, what crosses the border
+## 7.8 Yamf, what crosses the border
 
 The loader's output struct has a name: `Yamf`, for Yet Another
 Model Format. The name is a joke with the irony fully intended: a
 YAMF is precisely not a format (it lives only in memory, is never
-serialized, and has no version bytes). It commemorates the format
-zoo of The Engine's 5.4 while refusing to join it.
+serialized, and has no version bytes). It commemorates the format zoo of
+[Reading the Model](03-reading-the-model.md)'s 6.4 while refusing to
+join it.
 
 The rule it enforces: nothing GGUF-shaped crosses the border. The
 loader distills the file into exactly what the engine needs, in
@@ -322,23 +325,23 @@ Module layout, one concern per file, each with sibling tests:
 | file | concern |
 |---|---|
 | loader/mod.rs | export barrel only |
-| loader/container.rs | 6.2: header, metadata KVs, tensor infos, alignment |
-| loader/config.rs | 6.3: metadata keys to Qwen3Config |
-| loader/dequant.rs | 6.5: Q8_0 blocks to f32 |
-| loader/yamf.rs | 6.7: expected names, checks, the Yamf bundle |
+| loader/container.rs | 7.2: header, metadata KVs, tensor infos, alignment |
+| loader/config.rs | 7.3: metadata keys to Qwen3Config |
+| loader/dequant.rs | 7.5: Q8_0 blocks to f32 |
+| loader/yamf.rs | 7.7: expected names, checks, the Yamf bundle |
 
 The parser existing also makes `nucleon inspect model.gguf` nearly
 free: print version, architecture, dimensions, tensor types, and a
 supported/not verdict per check. It lands with the CLI chapter.
 
-## 6.9 What the tests will pin
+## 7.9 What the tests will pin
 
 All on synthetic GGUF files the tests write themselves; no network,
 no 640 MB fixture:
 
 1. happy path: a tiny hand-built file (two tensors, one Q8_0, one
    F32) round-trips with exact values;
-2. every refusal in 6.7's table, one test each: wrong magic, version
+2. every refusal in 7.7's table, one test each: wrong magic, version
    2 and the big-endian 50,331,648, foreign architecture, Q4_K
    tensor, missing/extra/mistyped metadata keys, lying string
    lengths, misaligned and out-of-bounds offsets, a bool byte of 7;
@@ -358,7 +361,7 @@ chapter: HF transformers 4.54.0 or newer loads this exact GGUF via
 `gguf_file=`, dequantizes to f32 the same way, and its greedy token
 ids become the ids nucleon must reproduce.
 
-## 6.10 Upcoming loader topics
+## 7.10 Upcoming loader topics
 
 1. Q4_K and friends: more block layouts in dequant.rs (Part III);
 2. fused dequant: weights stay packed in the map, kernels read blocks

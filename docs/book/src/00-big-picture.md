@@ -154,13 +154,14 @@ to hold in your head, connected by types too dumb to leak complexity.
 | 3 | gpu | the hardware: cores, memories, vendor comparison |
 | 4 | metal | writing GPU software: kernels, fusion, the Backend trait on GPU |
 | 5 | engine plan | what Part II builds, in which order, and why |
-| 6 | loader | reading config.json and safetensors |
-| 7 | tokenizer | encoding, and streaming decode without broken UTF-8 |
-| 8 | families/qwen3 | the full transformer forward pass |
-| 9 | generate | the loop with no cache: correct first, measured slow |
-| 10 | cache | KV storage as the first measured improvement |
-| 11 | sampler | greedy, temperature, top-k, top-p |
-| 12 | cli/chat | the ChatML template and the command line |
-| 13 | fast kernels | tuning matmul and attention toward llama.cpp |
-| 14 | gguf/quant | the GGUF container and 4-bit weights |
-| 15 | qwen3.8 | the qwen3_5 hybrid: Gated DeltaNet and a second cache |
+| 6 | reading the model | families, packages, formats, and the one-conversion thesis |
+| 7 | loader | the gate: GGUF in, Yamf out |
+| 8 | tokenizer | encoding, and streaming decode without broken UTF-8 |
+| 9 | families/qwen3 | the full transformer forward pass |
+| 10 | generate | the loop with no cache: correct first, measured slow |
+| 11 | cache | KV storage as the first measured improvement |
+| 12 | sampler | greedy, temperature, top-k, top-p |
+| 13 | cli/chat | the ChatML template and the command line |
+| 14 | fast kernels | tuning matmul and attention toward llama.cpp |
+| 15 | gguf/quant | more quant types and fused dequant |
+| 16 | qwen3.8 | the qwen3_5 hybrid: Gated DeltaNet and a second cache |
