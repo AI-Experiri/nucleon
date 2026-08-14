@@ -1,1 +1,0 @@
-# Loader: checkpoint to tensors
