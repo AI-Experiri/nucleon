@@ -113,3 +113,34 @@
     height: auto;
     margin: 0 auto;
 }
+
+/* Warning boxes: labeled cards for the engine narrative's hard truths
+   (no-spec formats, footguns). <div class="warn"> in markdown; block
+   HTML, so inner markup is plain HTML tags with no blank lines. */
+
+.content .warn {
+    position: relative;
+    padding: 2.2em 1.2em 0.6em 1.2em;
+    margin: 1.2em 0;
+    border: 1px solid rgba(204, 85, 85, 0.45);
+    border-left: 4px solid #cc5555;
+    border-radius: 8px;
+    background: rgba(204, 85, 85, 0.06);
+}
+
+.content .warn::before {
+    content: "\26A0  Warning";
+    position: absolute;
+    top: 0.5em;
+    left: 1.1em;
+    font-size: 0.72em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #cc5555;
+    opacity: 0.9;
+}
+
+.content .warn p {
+    margin: 0.5em 0;
+}

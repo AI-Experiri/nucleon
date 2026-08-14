@@ -98,15 +98,10 @@ to see it). For Qwen3-0.6B:
 
 Each file feeds exactly one of the blocks this part builds.
 
-config.json has no specification. No standards body defines it, no
-document lists its legal fields, and no two labs agree on its
-contents: each one invents whatever fields its architecture needs and
-ships them. Qwen3's config carries an explicit `head_dim` that
-overrides the usual hidden/heads convention; DeepSeek's carries MLA
-and MoE fields like `kv_lora_rank` and `n_routed_experts` that no
-other config has; Google's Gemma carries its own set. Nothing stops
-any lab from adding, renaming, or repurposing fields in its next
-release.
+<div class="warn">
+<p>config.json has no specification. No standards body defines it, no document lists its legal fields, and no two labs agree on its contents: each one ships whatever fields its architecture needs (Qwen3 an explicit <code>head_dim</code>, DeepSeek its <code>kv_lora_rank</code>, Gemma its own set), and nothing stops any of them from adding, renaming, or repurposing fields in the next release.</p>
+<p>This is a large part of what makes engine building hard. Engines do not lag new model releases because the math is secret; they lag because someone has to read the new config and modeling code and rewire the engine to match, for every architecture, every time.</p>
+</div>
 
 The only shared part is a convention, not a standard: everyone saves
 through the HF transformers library, `model_type` names the family,
