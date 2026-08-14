@@ -17,10 +17,13 @@ order, rule.
 
 ## 5.2 Models ship as families
 
-- checkpoint: one trained model you can download; a folder of weights
-  and configuration. The real one:
-  [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) on
-  Hugging Face (HF), the site checkpoints are distributed through.
+- checkpoint: originally a weights snapshot saved during training so a
+  run can resume; the ecosystem now uses the word for any saved
+  weights, including the final released ones (a release is the last
+  checkpoint that survived). In this book a checkpoint is a released
+  model you can download: a folder of weights and configuration. The
+  real one: [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B)
+  on Hugging Face (HF), the site checkpoints are distributed through.
 - family: the architecture checkpoints share. The `model_type` field
   in config.json ("qwen3") names it.
 
