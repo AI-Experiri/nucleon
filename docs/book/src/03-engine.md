@@ -26,7 +26,9 @@ the right weights.
 Two words this part uses constantly:
 
 - checkpoint: one trained model you can download, a folder of weights
-  and configuration. Qwen3-0.6B is a checkpoint.
+  and configuration. Qwen3-0.6B is a checkpoint; the real one lives on
+  Hugging Face (HF), the site checkpoints are distributed through:
+  [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B).
 - family: the architecture those checkpoints share; which blocks exist,
   in which order, with which normalizations. The `model_type` field in
   config.json ("qwen3") names the family.
@@ -65,6 +67,10 @@ checkpoint:
 | rope_theta / rms_norm_eps | 1000000 / 1e-6 |
 | tie_word_embeddings | true |
 
+Every number in that table is readable in the checkpoint's actual
+[config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json);
+open it once now, because the loader chapter parses exactly that file.
+
 `qwen3_5` is the flagship: Qwen3.8-27B, a 64-layer hybrid that needs
 operations we have not built yet. It gets its own chapter
 ([Qwen3.8, the hybrid](13-qwen38.md)). Nothing in Part II depends on
@@ -74,7 +80,9 @@ model-specific decision out of the shared code.
 
 ## 5.3 The package on disk
 
-A checkpoint downloads as a folder. For Qwen3-0.6B:
+A checkpoint downloads as a folder
+([browse Qwen3-0.6B's](https://huggingface.co/Qwen/Qwen3-0.6B/tree/main)
+to see it). For Qwen3-0.6B:
 
 | file | role |
 |---|---|
