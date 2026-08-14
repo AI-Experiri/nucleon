@@ -62,7 +62,7 @@ pub trait Backend {
     /// materializing the score matrix), which composition would forbid.
     ///
     /// Contract limits (study-grade, enforced by every backend): all dims
-    /// nonzero, and seq <= 4096 — the fused GPU kernel keeps the score
+    /// nonzero, n_heads divisible by n_kv_heads, and seq <= 4096 — the fused GPU kernel keeps the score
     /// row in threadgroup memory. Long-context support is future work
     /// and will change this contract explicitly. This method covers
     /// single-position decode; prefill and non-GQA cache layouts (MLA)

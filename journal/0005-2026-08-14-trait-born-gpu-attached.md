@@ -70,3 +70,14 @@ r8/r9/r11 with r10's doc fix; formally needs one more clean round.
   use; POV chapters recur (Tensor 0/1/2); one concern per file in
   module folders; backend stays a sibling of tensor (dependency
   direction, ADR-001 axes).
+
+## Convergence closed (combined backend + metal scope)
+
+Rounds 1-2 fixed contract gaps (uniform zero-dim behavior, checked CPU
+products, matvec rank check, head_dim stride cap); rounds 3-5 were
+defect-free with polish only (unified panic messages, per-dim guard
+pins, cap-helper regression tests, GQA divisibility in the trait doc).
+Converged r3/r4/r5. Standing dismissals, recorded: typed logical-length
+buffer wrapper (promoted to near-term, lands with resident MetalBackend
+storage), fused-kernel finite-range caveat (documented contract), macOS
+CI lane (when CI exists).

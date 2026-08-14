@@ -207,11 +207,24 @@ fn attention_rejects_every_zero_dim() {
         gpu.attention(&q, &kv, &kv, 1.0);
     }));
     assert!(msg.contains("nonzero"), "got: {msg}");
-    // zero heads
+    // zero query heads (kv heads present)
     let q = Tensor::zeros(vec![0, 2]);
+    let kv = Tensor::zeros(vec![1, 1, 2]);
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.attention(&q, &kv, &kv, 1.0);
+    }));
+    assert!(
+        msg.contains("nonzero") || msg.contains("divide"),
+        "got: {msg}"
+    );
+    // zero kv heads (query heads present)
+    let q = Tensor::zeros(vec![2, 2]);
     let kv = Tensor::zeros(vec![0, 1, 2]);
     let msg = panic_message(std::panic::AssertUnwindSafe(|| {
         gpu.attention(&q, &kv, &kv, 1.0);
     }));
-    assert!(msg.contains("nonzero"), "got: {msg}");
+    assert!(
+        msg.contains("nonzero") || msg.contains("divide"),
+        "got: {msg}"
+    );
 }

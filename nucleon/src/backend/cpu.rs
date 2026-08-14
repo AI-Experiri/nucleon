@@ -41,6 +41,8 @@ impl Backend for CpuBackend {
         assert_eq!(table.shape().len(), 2, "embed table must be [vocab, dim]");
         let dim = table.shape()[1];
         assert!(dim > 0, "embed dim must be nonzero");
+        let vocab = table.shape()[0];
+        assert!((id as usize) < vocab, "token id {id} >= vocab {vocab}");
         Tensor::new(vec![dim], table.row(id as usize).to_vec())
     }
 
