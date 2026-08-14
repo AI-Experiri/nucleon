@@ -1,0 +1,47 @@
+<svg width="680" height="270" viewBox="0 0 680 270" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <!-- the family wiring, written once -->
+  <rect x="200" y="26" width="280" height="56" rx="10" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="340" y="49" text-anchor="middle" fill="#f0c893">family "qwen3": the wiring</text>
+  <text x="340" y="68" text-anchor="middle" font-size="12" opacity="0.7">implemented once (families/qwen3.rs)</text>
+
+  <!-- fan-out arrows -->
+  <path d="M 260 86 C 190 120, 120 140, 74 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+  <path d="M 295 86 C 250 125, 215 145, 184 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+  <path d="M 325 86 C 310 125, 300 145, 291 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+  <path d="M 355 86 C 370 125, 380 145, 389 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+  <path d="M 385 86 C 430 125, 465 145, 496 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+  <path d="M 420 86 C 490 120, 560 140, 606 166" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrF)"/>
+
+  <!-- the checkpoints -->
+  <rect x="24" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="70" y="193" text-anchor="middle" fill="#c0cadb">0.6B</text>
+  <text x="70" y="212" text-anchor="middle" font-size="11" opacity="0.7">28 layers</text>
+
+  <rect x="132" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="178" y="193" text-anchor="middle" fill="#c0cadb">1.7B</text>
+  <text x="178" y="212" text-anchor="middle" font-size="11" opacity="0.7">config only</text>
+
+  <rect x="240" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="286" y="193" text-anchor="middle" fill="#c0cadb">4B</text>
+  <text x="286" y="212" text-anchor="middle" font-size="11" opacity="0.7">config only</text>
+
+  <rect x="348" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="394" y="193" text-anchor="middle" fill="#c0cadb">8B</text>
+  <text x="394" y="212" text-anchor="middle" font-size="11" opacity="0.7">config only</text>
+
+  <rect x="456" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="502" y="193" text-anchor="middle" fill="#c0cadb">14B</text>
+  <text x="502" y="212" text-anchor="middle" font-size="11" opacity="0.7">config only</text>
+
+  <rect x="564" y="170" width="92" height="56" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.6"/>
+  <text x="610" y="193" text-anchor="middle" fill="#c0cadb">32B</text>
+  <text x="610" y="212" text-anchor="middle" font-size="11" opacity="0.7">config only</text>
+
+  <text x="340" y="256" text-anchor="middle" font-size="12" opacity="0.7">six checkpoints, one implementation: only the numbers in config.json change</text>
+</svg>
