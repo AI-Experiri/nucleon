@@ -73,8 +73,14 @@ refuses it by value.
 
 ## 6.3 The metadata this file carries
 
-All 28 keys are enumerated in the research doc; the ones the loader
-reads for the config:
+You can see all of this without downloading anything: Hugging Face
+parses GGUF server-side, so the
+[file viewer](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF?show_file_info=Qwen3-0.6B-Q8_0.gguf)
+shows every metadata key and the full tensor list in the browser, and
+the [model API](https://huggingface.co/api/models/Qwen/Qwen3-0.6B-GGUF)
+returns a parsed `gguf` object for scripts. All 28 keys are
+enumerated in the research doc; the ones the loader reads for the
+config:
 
 | GGUF metadata key | value | Qwen3Config field |
 |---|---|---|
