@@ -136,10 +136,27 @@ It is also why our loader takes no defaults for required fields: with
 no standard to fall back on, a value the file does not state is an
 error, not a guess.
 
-## 5.4 The two formats, drawn
+## 5.4 The formats, drawn
 
-The same weights ship in two packagings, and the difference is where
-the configuration lives:
+The same weights ship in several packagings. The full landscape and
+its two lineages first:
+
+<div class="diagram"><img src="diagrams/formats-all.svg" alt="format lineages: pytorch bin to safetensors, GGML to GGUF, ONNX beside them"></div>
+
+| format | from | since | shape | role for LLM weights today |
+|---|---|---|---|---|
+| pytorch .bin | PyTorch | 2016 | folder + sidecars | the old HF default; pickle-based, executes code on load; still on older repos |
+| safetensors | Hugging Face | 2022 | folder + sidecars | the HF default; what Part II reads |
+| GGML / GGJT | llama.cpp | early 2023 | one file | GGUF's predecessors, superseded |
+| GGUF | llama.cpp | Aug 2023 | one file | the local/quantized world's default; Part III |
+| ONNX | Microsoft + Meta | 2017 | one graph file | cross-framework deployment; not how LLMs release weights |
+
+(Names like GPTQ and AWQ on HF are not containers: they are
+quantization methods, and those repos still ship safetensors files
+holding the quantized values.)
+
+The two nucleon reads, in detail; the difference is where the
+configuration lives:
 
 <div class="diagram"><img src="diagrams/formats-layout.svg" alt="safetensors folder with sidecar jsons vs GGUF single self-describing file"></div>
 
@@ -156,7 +173,7 @@ f32 at load; computing in bf16 is Part III.
 
 <div class="note">
 <p>Where the formats come from: safetensors is Hugging Face's own format, built in 2022 to replace pickle-based PyTorch checkpoint files, which can execute arbitrary code when loaded. Its reference implementation is written in Rust, and our loader uses that exact crate (<a href="https://huggingface.co/docs/safetensors/index">format docs</a>, <a href="https://github.com/huggingface/safetensors">source</a>).</p>
-<p>GGUF comes from the llama.cpp project: one self-describing file carrying weights and all metadata as key-value pairs (dimensions, even the whole tokenizer), so nothing sits beside it. Unlike config.json, GGUF has an actual written <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">specification</a>.</p>
+<p>GGUF comes from the llama.cpp project (August 2023, replacing its earlier GGML and GGJT files): one self-describing file carrying weights and all metadata as key-value pairs (dimensions, even the whole tokenizer), so nothing sits beside it. Unlike config.json, GGUF has an actual written <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">specification</a>.</p>
 </div>
 
 ## 5.5 The engine landscape
