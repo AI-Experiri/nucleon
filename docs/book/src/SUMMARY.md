@@ -14,8 +14,8 @@
 
 # Part II: The engine
 
-- [The Tokenizer](05-tokenizer.md)
 - [The Loader](04-loader.md)
+- [The Tokenizer](05-tokenizer.md)
 - [Qwen3](07-qwen3.md)
 - [The Loop](09-generate.md)
 - [The Cache](06-cache.md)
