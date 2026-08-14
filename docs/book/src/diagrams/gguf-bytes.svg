@@ -1,0 +1,53 @@
+<svg width="700" height="340" viewBox="0 0 700 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <text x="350" y="28" text-anchor="middle" fill="#c0cadb" font-size="14">Qwen3-0.6B-Q8_0.gguf, byte by byte (little-endian everywhere)</text>
+
+  <!-- segments -->
+  <rect x="30" y="46" width="112" height="62" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="86" y="70" text-anchor="middle" font-size="12" fill="#c0cadb">header</text>
+  <text x="86" y="88" text-anchor="middle" font-size="11" opacity="0.7">"GGUF" 3 310 28</text>
+
+  <rect x="142" y="46" width="168" height="62" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="226" y="70" text-anchor="middle" font-size="12" fill="#f0c893">28 metadata KVs</text>
+  <text x="226" y="88" text-anchor="middle" font-size="11" opacity="0.7">dims, tokenizer, template</text>
+
+  <rect x="310" y="46" width="158" height="62" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="389" y="70" text-anchor="middle" font-size="12" fill="#c0cadb">310 tensor infos</text>
+  <text x="389" y="88" text-anchor="middle" font-size="11" opacity="0.7">name, dims, type, offset</text>
+
+  <rect x="468" y="46" width="26" height="62" rx="6" fill="rgba(139,152,169,0.08)" stroke="#8b98a9" stroke-opacity="0.5"/>
+  <text x="481" y="82" text-anchor="middle" font-size="10" opacity="0.7">pad</text>
+
+  <rect x="494" y="46" width="176" height="62" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="582" y="70" text-anchor="middle" font-size="12" fill="#c0cadb">tensor data</text>
+  <text x="582" y="88" text-anchor="middle" font-size="11" opacity="0.7">offsets count from here</text>
+
+  <!-- byte ticks -->
+  <text x="30" y="128" font-size="11" opacity="0.7">0</text>
+  <text x="142" y="128" font-size="11" opacity="0.7">24</text>
+  <text x="494" y="128" font-size="11" opacity="0.7">5,951,136</text>
+  <text x="670" y="128" text-anchor="end" font-size="11" opacity="0.7">639,446,688</text>
+
+  <!-- zoom: one metadata KV -->
+  <rect x="40" y="160" width="280" height="118" rx="10" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5"/>
+  <text x="60" y="186" font-size="12" fill="#f0c893">one metadata KV:</text>
+  <text x="60" y="210" font-size="12" fill="#c0cadb">"qwen3.embedding_length"</text>
+  <text x="60" y="232" font-size="12" fill="#c0cadb">type: 4 (u32)</text>
+  <text x="60" y="254" font-size="12" fill="#c0cadb">value: 1024</text>
+  <path d="M 226 160 C 226 140, 226 128, 226 112" stroke="#e0a458" stroke-opacity="0.7" fill="none" marker-end="url(#arrG)"/>
+
+  <!-- zoom: one tensor info -->
+  <rect x="360" y="160" width="310" height="118" rx="10" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5"/>
+  <text x="380" y="186" font-size="12" fill="#f0c893">one tensor info:</text>
+  <text x="380" y="210" font-size="12" fill="#c0cadb">"token_embd.weight"</text>
+  <text x="380" y="232" font-size="12" fill="#c0cadb">dims [1024, 151936] (reversed vs HF)</text>
+  <text x="380" y="254" font-size="12" fill="#c0cadb">type: 8 (Q8_0), offset: 4096</text>
+  <path d="M 500 160 C 520 140, 540 128, 550 112" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrG)"/>
+
+  <text x="350" y="316" text-anchor="middle" font-size="12" opacity="0.75">version != 3 is refused before anything else is read</text>
+</svg>

@@ -17,10 +17,11 @@ loader, tokenizer, families, cache, sampler, generate, CLI) and
 `nucleon-metal` (MetalBackend + MSL kernels). Every step is a lego block:
 built, tested, journaled before the next begins.
 
-**Tech stack:** memmap2 (hand-parsed GGUF; a community gguf crate or
-candle-core's reader as dev-dep test oracle only), tokenizers 0.23
-(default-features=false, fancy-regex; tokenizer rebuilt from GGUF
-metadata), half 2.7, serde_json, objc2-metal 0.3.
+**Tech stack:** memmap2 (the GGUF parser is nucleon's own code;
+candle-core 0.11 as dev-dep test oracle only), tokenizers 0.23
+(default-features=false, fancy-regex — onig is C; tokenizer rebuilt
+from GGUF metadata), half 2.7 (fp16 block scales), objc2-metal 0.3.
+serde_json dropped: config comes from typed GGUF metadata, not JSON.
 Grounding facts: `docs/research/*.md`. Each step below gets its own detailed
 task plan (with code) when we reach it; this document is the map.
 
