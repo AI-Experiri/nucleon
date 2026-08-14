@@ -23,12 +23,15 @@ order, rule.
   Hugging Face (HF), the site checkpoints are distributed through.
 - family: the architecture checkpoints share. The `model_type` field
   in config.json ("qwen3") names it.
-- Qwen3 shipped six dense checkpoints: 0.6B, 1.7B, 4B, 8B, 14B, 32B.
-  Same wiring, different numbers. (The MoE releases are a separate
-  family, `qwen3_moe`, whose MLP is routed experts; not building it.)
-- Every lab ships this way: Llama 3.1 as 8B/70B/405B, Gemma 2 as
-  2B/9B/27B. One family, sizes as checkpoints. Support the family
-  once and the whole size range runs.
+
+Every lab ships this way — one family, sizes as checkpoints:
+
+| lab | family (`model_type`) | checkpoints |
+|---|---|---|
+| Qwen | qwen3 (dense) | 0.6B, 1.7B, 4B, 8B, 14B, 32B |
+| Qwen | qwen3_moe | routed-experts variants (separate family; not building it) |
+| Meta | llama | Llama 3.1 at 8B, 70B, 405B |
+| Google | gemma2 | Gemma 2 at 2B, 9B, 27B |
 
 <div class="diagram"><img src="diagrams/family-checkpoints.svg" alt="one family implementation runs six checkpoints"></div>
 
@@ -42,10 +45,20 @@ engine supports a model family" means in this book:
 
 We pay them for two families:
 
-- `qwen3`: this part, smallest checkpoint first. Its numbers, from the
-  real [config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json)
-  (also as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json),
-  the exact bytes our loader reads):
+| | `qwen3` | `qwen3_5` |
+|---|---|---|
+| checkpoint we run | Qwen3-0.6B | Qwen3.8-27B, the flagship |
+| layers | 28, all GQA attention | 64: 48 Gated DeltaNet + 16 attention |
+| new ops needed | none (see 5.5) | Gated DeltaNet, hybrid cache |
+| built in | this part | [Qwen3.8, the hybrid](13-qwen38.md) |
+
+Part II never touches `qwen3_5`, but it already shaped two designs:
+the cache is a trait, and families own every model-specific decision.
+
+`qwen3`'s numbers, from the real
+[config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json)
+(also as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json),
+the exact bytes our loader reads):
 
 | config.json field | Qwen3-0.6B |
 |---|---|
@@ -57,11 +70,6 @@ We pay them for two families:
 | vocab_size | 151936 |
 | rope_theta / rms_norm_eps | 1000000 / 1e-6 |
 | tie_word_embeddings | true |
-
-- `qwen3_5`: the flagship, Qwen3.8-27B, a 64-layer hybrid needing new
-  operations ([Qwen3.8, the hybrid](13-qwen38.md)). Part II never
-  touches it, but it already shaped two designs: the cache is a trait,
-  and families own every model-specific decision.
 
 ## 5.3 The package on disk
 
