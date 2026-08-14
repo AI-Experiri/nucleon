@@ -138,10 +138,9 @@ error, not a guess.
 
 ## 5.4 The formats, drawn
 
-The same weights ship in several packagings. The full landscape and
-its two lineages first:
-
-<div class="diagram"><img src="diagrams/formats-all.svg" alt="format lineages: pytorch bin to safetensors, GGML to GGUF, ONNX beside them"></div>
+The same weights ship in several packagings. The full landscape, two
+of which are lineages (pytorch .bin was replaced by safetensors;
+GGML/GGJT by GGUF):
 
 | format | from | since | shape | role for LLM weights today |
 |---|---|---|---|---|
