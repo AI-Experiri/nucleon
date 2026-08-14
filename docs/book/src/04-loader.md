@@ -178,7 +178,18 @@ read by key name, no JSON anywhere. Missing key, wrong type, or
 > returns the `Err` to the caller early. Sibling: `Option<T>` for
 > absence without an error. [The Book, ch. 9.2](https://doc.rust-lang.org/book/ch09-02-recoverable-errors-with-result.html)
 
-## 6.7 Errors and the strict contract
+## 6.7 The gate
+
+The loader is the engine's gate. It runs at the very beginning, once,
+and exactly two things can come out: a complete `Yamf`, or a refusal
+that names the problem. Support is decided here and nowhere deeper:
+if the file's family does not match, the gate answers "architecture
+llama; nucleon supports: qwen3" and stops. Nothing half-loaded ever
+reaches a forward pass.
+
+Every refusal carries three parts: what we expected, what the file
+actually held, and, in their difference, why this model cannot be
+supported.
 
 The world can fail (files are the world), so loading returns
 `Result<_, LoaderError>`; panics stay reserved for caller bugs, the
@@ -226,9 +237,22 @@ zoo of The Engine's 5.4 while refusing to join it.
 
 The rule the API enforces: nothing GGUF-shaped crosses the border.
 The loader distills the file into exactly what the engine needs, in
-plain types; every "not supported" refusal happens here, before the
-engine sees anything; whatever else the file carries is dropped. No
-other module ever receives raw metadata.
+plain types; every "not supported" refusal happens at the gate,
+before the engine sees anything; whatever else the file carries is
+dropped. No other module ever receives raw metadata.
+
+`Yamf` is not designed from nothing: it steals one proven idea from
+each format in The Engine's 5.4 zoo, and rejects two on purpose:
+
+| source | its mechanism | in Yamf |
+|---|---|---|
+| GGUF | one self-described bundle | complete in one struct: weights, config, tokenizer, template |
+| GGUF | typed metadata, never stringly JSON | typed fields, checked by the compiler |
+| GGUF | the architecture tag namespaces the rest | the family-tag pattern: config splits into a family-tagged enum when family two arrives |
+| safetensors | dumbness as a virtue: structure that cannot act | inert data: no file handles, no logic; IO is fully over when load returns |
+| safetensors | full inventory declared up front | all 310 tensors verified before the struct exists |
+| ONNX | carries the program (a compute graph) | rejected: family code is our program; the struct carries data only |
+| pickle .bin | a container that can execute | the rule under everything: nothing crossing the gate is executable |
 
 ```rust
 pub struct Yamf {
