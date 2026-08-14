@@ -94,15 +94,33 @@ A checkpoint downloads as a folder
 <p>This is a large part of why engines are hard. They lag new models not because the math is secret, but because someone must read each new config and modeling code and rewire the engine to match. Every architecture, every time.</p>
 </div>
 
-The only shared parts are conventions from the HF transformers
-library, which writes the file when a lab saves its model:
+The same story holds for every json in the package. Each is written
+by the HF stack when the lab saves its model, and the class that
+writes it is the only schema it has:
 
-1. `model_type` selects a configuration class inside that library;
-2. that class is the only schema there is
-   ([Qwen3Config](https://huggingface.co/docs/transformers/model_doc/qwen3)
-   for "qwen3");
-3. the handful of fields every model shares comes from its base class,
-   [PretrainedConfig](https://huggingface.co/docs/transformers/main_classes/configuration).
+| file | the class that writes it (= the schema) |
+|---|---|
+| config.json | the family's config class, picked by `model_type`: [Qwen3Config](https://huggingface.co/docs/transformers/model_doc/qwen3); the few fields every model shares come from the base class, [PretrainedConfig](https://huggingface.co/docs/transformers/main_classes/configuration) |
+| generation_config.json | [GenerationConfig](https://huggingface.co/docs/transformers/main_classes/text_generation) — stop ids, default sampling |
+| tokenizer_config.json | the tokenizer class's saved settings; the chat template is a string field in here |
+| tokenizer.json | the [HF tokenizers library](https://huggingface.co/docs/tokenizers/index)'s own serialization (the one file with real documentation) |
+
+Two questions this table raises, answered now because the tokenizer
+and loop chapters depend on them:
+
+- where token ids come from: the lab assigns them when it freezes the
+  vocab before training, and the model learns embeddings for exactly
+  those ids. Qwen3 reserves 151643 upward for special tokens: 151643
+  `<|endoftext|>`, 151644 `<|im_start|>`, 151645 `<|im_end|>`, and so
+  on, recorded in tokenizer.json's added-tokens section. Nothing
+  about these numbers is standard; they are this family's
+  training-time choices.
+- where the meanings live: the files hold values; their semantics are
+  defined by the family's modeling code,
+  [modeling_qwen3.py](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3/modeling_qwen3.py).
+  The model was trained with that code, so it outranks papers and
+  blog posts when they disagree. Our `families/qwen3.rs` is a Rust
+  port of what that file actually does.
 
 So reading the config is the first step of supporting any model, every
 time, and it always carries surprises:
