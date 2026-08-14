@@ -98,17 +98,47 @@ to see it). For Qwen3-0.6B:
 
 Each file feeds exactly one of the blocks this part builds.
 
-config.json has no standalone specification. The model's authors do
-not write it by hand; the HF transformers library writes it when they
-save the trained model. The `model_type` value selects a configuration
-class inside that library
+config.json has no specification. No standards body defines it, no
+document lists its legal fields, and no two labs agree on its
+contents: each one invents whatever fields its architecture needs and
+ships them. Qwen3's config carries an explicit `head_dim` that
+overrides the usual hidden/heads convention; DeepSeek's carries MLA
+and MoE fields like `kv_lora_rank` and `n_routed_experts` that no
+other config has; Google's Gemma carries its own set. Nothing stops
+any lab from adding, renaming, or repurposing fields in its next
+release.
+
+The only shared part is a convention, not a standard: everyone saves
+through the HF transformers library, `model_type` names the family,
+and the family's configuration class inside that library
 ([Qwen3Config](https://huggingface.co/docs/transformers/model_doc/qwen3)
-for "qwen3"), and that class's fields and defaults are the only schema
-there is; the fields every model shares are defined by its base class,
-[PretrainedConfig](https://huggingface.co/docs/transformers/main_classes/configuration).
-Because the schema is library code rather than a standard, our loader
-takes no defaults for required fields: a value the file does not state
-is an error, not a guess.
+for "qwen3", with the handful of fields everyone shares defined by the
+base class
+[PretrainedConfig](https://huggingface.co/docs/transformers/main_classes/configuration))
+is the closest thing to a schema that exists. So an engine cannot
+"parse config.json" in general; it learns one family's fields at a
+time, which is the correctness gate from 5.2 showing up before a
+single weight is read. It is also why our loader takes no defaults for
+required fields: with no standard to fall back on, a value the file
+does not state is an error, not a guess.
+
+Reading the config is therefore the first step of supporting any
+model, every single time. Three examples from models this book
+touches:
+
+1. Qwen3-0.6B: the config carries `head_dim: 128`, while the usual
+   hidden/heads arithmetic gives 64. An engine that computes instead
+   of reading loads every weight successfully and generates garbage.
+2. Qwen3.8-27B: same vendor, next generation, and the config sprouts
+   fields qwen3 never had: `full_attention_interval: 4` (three of
+   every four layers are a different block type) and
+   `partial_rotary_factor: 0.25` (only a quarter of each head
+   rotates). The family chapter in Part III exists because of these
+   fields.
+3. DeepSeek-V2-Lite: `kv_lora_rank: 512` but `q_lora_rank: null`;
+   the same family's larger checkpoint sets both. One nullable field
+   switches an entire projection block on or off between two models
+   with the same `model_type`.
 
 Two format words:
 
