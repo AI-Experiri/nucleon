@@ -40,6 +40,7 @@ impl Backend for CpuBackend {
     fn embed(&self, table: &Tensor, id: u32) -> Tensor {
         assert_eq!(table.shape().len(), 2, "embed table must be [vocab, dim]");
         let dim = table.shape()[1];
+        assert!(dim > 0, "embed dim must be nonzero");
         Tensor::new(vec![dim], table.row(id as usize).to_vec())
     }
 
@@ -50,6 +51,7 @@ impl Backend for CpuBackend {
             x.len(),
             "weight columns must match input length"
         );
+        assert!(!x.is_empty(), "matvec input must be nonzero-length");
         let out_dim = w.shape()[0];
         let mut y = Vec::with_capacity(out_dim);
         for row in 0..out_dim {
@@ -66,6 +68,7 @@ impl Backend for CpuBackend {
         assert_eq!(a.shape().len(), 2, "a must be [m, k]");
         assert_eq!(b.shape().len(), 2, "b must be [n, k]");
         assert_eq!(a.shape()[1], b.shape()[1], "inner dims must match");
+        assert!(a.shape()[1] > 0, "matmul inner dim must be nonzero");
         let (m, n) = (a.shape()[0], b.shape()[0]);
         let mut c = Vec::with_capacity(m * n);
         for i in 0..m {
@@ -117,6 +120,7 @@ impl Backend for CpuBackend {
     fn rope(&self, x: &Tensor, pos: u32, theta: f32) -> Tensor {
         assert_eq!(x.shape().len(), 2, "rope input must be [n_heads, head_dim]");
         let (n_heads, head_dim) = (x.shape()[0], x.shape()[1]);
+        assert!(head_dim > 0, "rope head_dim must be nonzero");
         assert_eq!(head_dim % 2, 0, "head_dim must be even to form pairs");
         let half = head_dim / 2;
         let mut out = x.data().to_vec();

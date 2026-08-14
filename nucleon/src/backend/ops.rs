@@ -13,6 +13,10 @@
 
 use crate::tensor::Tensor;
 
+/// Contract for every op: all dimensions are nonzero. Zero-sized shapes
+/// are upstream bugs (an empty cache, a malformed config) and panic
+/// identically on every backend, so generic code cannot pass on one
+/// executor and die on another.
 pub trait Backend {
     /// Elementwise a + b. Shapes must match.
     fn add(&self, a: &Tensor, b: &Tensor) -> Tensor;

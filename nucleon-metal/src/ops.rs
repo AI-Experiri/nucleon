@@ -282,7 +282,9 @@ impl MetalOps {
             n_heads.is_multiple_of(n_kv_heads),
             "query heads must divide evenly over kv heads (GQA)"
         );
-        // kernel flattens all three index spaces in 32-bit math
+        // kernel flattens all three index spaces in 32-bit math, and the
+        // output loop strides head_dim by the threadgroup size
+        reduction_dim_u32(head_dim);
         dim_u32(q_elems);
         dim_u32(kv_elems);
         n_heads

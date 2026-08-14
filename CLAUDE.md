@@ -189,6 +189,9 @@ higgs model: unit gate measures production lines only.
 
 ## Commit discipline
 
+- Branching: day-to-day work happens on `develop`; `main` receives
+  merges (user decision). Remote: git@github.com:AI-Experiri/nucleon.
+
 - One logical unit per commit; conventional-commit subject.
 - End commit messages with the `Co-Authored-By` trailer.
 - Commit/push only when asked.

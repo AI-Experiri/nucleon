@@ -203,3 +203,21 @@ fn attention_rejects_empty_sequence() {
     let kv = Tensor::zeros(vec![1, 0, 2]);
     cpu.attention(&q, &kv, &kv, 1.0);
 }
+
+#[test]
+#[should_panic(expected = "nonzero")]
+fn matvec_rejects_empty_input() {
+    CpuBackend.matvec(&Tensor::zeros(vec![4, 0]), &Tensor::zeros(vec![0]));
+}
+
+#[test]
+#[should_panic(expected = "nonzero")]
+fn matmul_rejects_zero_inner_dim() {
+    CpuBackend.matmul(&Tensor::zeros(vec![2, 0]), &Tensor::zeros(vec![3, 0]));
+}
+
+#[test]
+#[should_panic(expected = "nonzero")]
+fn rope_rejects_zero_head_dim() {
+    CpuBackend.rope(&Tensor::zeros(vec![2, 0]), 1, 1e6);
+}
