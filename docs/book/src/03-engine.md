@@ -45,8 +45,8 @@ numbers from config.json, and every size runs. Supporting a family
 costs two things:
 
 1. the correctness gate: every block the family needs exists and is
-   wired exactly right, proven by the golden test from
-   [the map chapter](00-big-picture.md) (1.5);
+   wired exactly right, proven by the golden test from the map
+   chapter's [1.5](00-big-picture.md#15-correctness);
 2. the speed gate: the operations the family spends its time in get
    fast kernels for that family's shapes, which is Part III's job.
 
@@ -97,6 +97,18 @@ to see it). For Qwen3-0.6B:
 <div class="diagram"><img src="diagrams/engine-package.svg" alt="each package file feeds one engine block"></div>
 
 Each file feeds exactly one of the blocks this part builds.
+
+config.json has no standalone specification. The model's authors do
+not write it by hand; the HF transformers library writes it when they
+save the trained model. The `model_type` value selects a configuration
+class inside that library
+([Qwen3Config](https://huggingface.co/docs/transformers/model_doc/qwen3)
+for "qwen3"), and that class's fields and defaults are the only schema
+there is; the fields every model shares are defined by its base class,
+[PretrainedConfig](https://huggingface.co/docs/transformers/main_classes/configuration).
+Because the schema is library code rather than a standard, our loader
+takes no defaults for required fields: a value the file does not state
+is an error, not a guess.
 
 Two format words:
 
@@ -151,8 +163,8 @@ operations, already implemented on both executors, already
 parity-tested. Part II needs zero new kernels; that is why Part I was
 built first. The two operations the list skips are covered too: softmax
 runs inside the attention call, and matmul replaces matvec when prefill
-processes many tokens at once (prefill and decode are defined in
-[the map chapter](00-big-picture.md), 1.3).
+processes many tokens at once (prefill and decode are defined in the
+map chapter's [1.3](00-big-picture.md#13-prefill-and-decode)).
 
 ## 5.6 The order, and the rule
 
@@ -180,8 +192,8 @@ The build order:
    falls as the sequence grows; that falling curve is the baseline the
    improvements are judged against.
 7. The golden test: the same prompt through HF transformers once,
-   greedy on both sides, token ids must match exactly
-   ([the map chapter](00-big-picture.md), 1.5). When they do not
+   greedy on both sides, token ids must match exactly (the map
+   chapter's [1.5](00-big-picture.md#15-correctness)). When they do not
    match, the method is layer-by-layer: dump the reference model's
    hidden states, diff against ours, fix the first layer that
    diverges.
