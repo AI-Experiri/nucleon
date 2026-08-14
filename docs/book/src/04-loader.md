@@ -227,7 +227,7 @@ the file in as it is touched, and the mapping is `unsafe` (the box is
 in [Metal 0](02-metal.md)) because Rust cannot prove the file stays
 unmodified; our invariant is a local file nobody rewrites mid-run.
 
-## 6.8 The API
+## 6.8 Yamf, what crosses the border
 
 The loader's output struct has a name: `Yamf`, for Yet Another
 Model Format. The name is a joke with the irony fully intended: a
@@ -235,59 +235,48 @@ YAMF is precisely not a format (it lives only in memory, is never
 serialized, and has no version bytes). It commemorates the format
 zoo of The Engine's 5.4 while refusing to join it.
 
-The rule the API enforces: nothing GGUF-shaped crosses the border.
-The loader distills the file into exactly what the engine needs, in
-plain types; every "not supported" refusal happens at the gate,
-before the engine sees anything; whatever else the file carries is
-dropped. No other module ever receives raw metadata.
-
-`Yamf` is not designed from nothing: it steals one proven idea from
-each format in The Engine's 5.4 zoo, and rejects two on purpose:
-
-| source | its mechanism | in Yamf |
-|---|---|---|
-| GGUF | one self-described bundle | complete in one struct: weights, config, tokenizer, template |
-| GGUF | typed metadata, never stringly JSON | typed fields, checked by the compiler |
-| GGUF | the architecture tag namespaces the rest | the family-tag pattern: config splits into a family-tagged enum when family two arrives |
-| safetensors | dumbness as a virtue: structure that cannot act | inert data: no file handles, no logic; IO is fully over when load returns |
-| safetensors | full inventory declared up front | all 310 tensors verified before the struct exists |
-| ONNX | carries the program (a compute graph) | rejected: family code is our program; the struct carries data only |
-| pickle .bin | a container that can execute | the rule under everything: nothing crossing the gate is executable |
+The rule it enforces: nothing GGUF-shaped crosses the border. The
+loader distills the file into exactly what the engine needs, in
+plain types; whatever else the file carries is dropped; no other
+module ever receives raw metadata. This is how it looks:
 
 ```rust
 pub struct Yamf {
     pub config: Qwen3Config,
     pub tensors: HashMap<String, Tensor>,
-    pub tokenizer: TokenizerData,   // consumed by The Tokenizer
-    pub chat_template: String,      // consumed by The CLI
+    pub tokenizer: TokenizerData,
+    pub chat_template: String,
 }
 
 pub struct TokenizerData {
-    pub tokens: Vec<String>,          // 151936 entries
+    pub tokens: Vec<String>,
     pub merges: Vec<(String, String)>,
-    pub token_types: Vec<TokenType>,  // normal / control / unused ...
-    pub pre: String,                  // "qwen2": selects the split regex
+    pub token_types: Vec<TokenType>,
+    pub pre: String,
     pub eos_token_id: u32,
 }
-```
-
-`TokenizerData`'s shape is not qwen3-specific: it is the shape of
-every byte-level BPE tokenizer (GGUF's tokenizer model "gpt2"; Llama
-3 ships the same shape, different contents). The values are Qwen3's,
-and `pre` is the one family-flavored field: it names which
-pre-tokenizer regex to build. A different tokenizer kind
-(SentencePiece, GGUF model "llama", scores instead of merges) would
-grow a variant here, the same way a second family will split
-`Qwen3Config` behind the families seam.
-
-```rust
 
 pub fn load(path: &Path) -> Result<Yamf, LoaderError>
 ```
 
-The tokenizer block receives those plain vectors, never the file; if
-the tokenizer chapter ever needs one more piece, the loader grows one
-more field, and the border stays where it is.
+Each piece, what it is for, and where the idea was stolen from:
+
+| piece | holds | consumed by | stolen from |
+|---|---|---|---|
+| `config` | the family's dimension numbers as typed values (u32 layer count, f32 epsilon), read by key name | the Qwen3 forward pass | GGUF's typed metadata: values carry their types, and the compiler keeps enforcing them after the file is gone |
+| `tensors` | all 310 weights as f32 `Tensor`s, dims un-reversed, shapes already checked | the forward pass | safetensors' up-front inventory: the full tensor list is verified complete before this struct can exist |
+| `tokenizer` | tokens, merges, token types, the pre id, the eos id, as plain vectors | The Tokenizer chapter | GGUF's bundle idea: the tokenizer travels with the weights, nothing external needed |
+| `tokenizer.pre` | "qwen2", the tag naming which split regex to build | the tokenizer build | GGUF's architecture-tag pattern: a small tag tells you how to read the rest |
+| `chat_template` | the 4100-character ChatML template string | the chat module (the CLI calls it later) | GGUF's bundle again: the conversation format ships inside the model file |
+| the struct as a whole | inert data only: no file handles, no logic, nothing executable; IO is fully over when `load` returns | everything downstream | safetensors' dumbness-as-a-virtue, plus two rejections: ONNX's program-carrying (family code is our program) and pickle's executability (nothing crossing the gate can act) |
+
+`TokenizerData`'s shape is not qwen3-specific: it is the shape of
+every byte-level BPE tokenizer (GGUF's tokenizer model "gpt2"; Llama
+3 ships the same shape, different contents). The values are Qwen3's,
+and `pre` is the one family-flavored field. A different tokenizer
+kind (SentencePiece, GGUF model "llama", scores instead of merges)
+would grow a variant here, the same way a second family will split
+`Qwen3Config` behind the families seam.
 
 Two properties this struct must keep as it grows:
 
