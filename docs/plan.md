@@ -4,7 +4,8 @@
 > or superpowers:executing-plans, task-by-task. Steps use `- [ ]` for tracking.
 
 **Goal:** a pure-Rust LLM inference engine that generates real tokens from
-Qwen3-0.6B on CPU (M1), reaches GPU speed via our own Metal kernels (M2),
+Qwen3-0.6B (official Q8_0 GGUF — ADR 004: GGUF is the ONLY weights
+format, for the engine's whole life) on CPU (M1), reaches GPU speed via our own Metal kernels (M2),
 runs quantized GGUF (M3), and lands the flagship: Qwen3.8-27B, family
 qwen3_5 — Gated DeltaNet hybrid layers, hybrid recurrent+KV cache (M4).
 Facts: docs/research/qwen38-27b.md. DeepSeek MLA+MoE moves to the
@@ -16,8 +17,10 @@ loader, tokenizer, families, cache, sampler, generate, CLI) and
 `nucleon-metal` (MetalBackend + MSL kernels). Every step is a lego block:
 built, tested, journaled before the next begins.
 
-**Tech stack:** safetensors 0.8 + memmap2, tokenizers 0.23
-(default-features=false, fancy-regex), half 2.7, serde_json, objc2-metal 0.3.
+**Tech stack:** memmap2 (hand-parsed GGUF; a community gguf crate or
+candle-core's reader as dev-dep test oracle only), tokenizers 0.23
+(default-features=false, fancy-regex; tokenizer rebuilt from GGUF
+metadata), half 2.7, serde_json, objc2-metal 0.3.
 Grounding facts: `docs/research/*.md`. Each step below gets its own detailed
 task plan (with code) when we reach it; this document is the map.
 
@@ -46,20 +49,25 @@ Why now: with ops in hand, everything above is plumbing.
 Proof: TDD — each op vs tiny hand-computed cases (2x2 matmul by hand, rope at
 position 0 = identity for the cos part, softmax sums to 1, …).
 
-### Step 3 — Loader: checkpoint → tensors `[M1]`
-`nucleon/src/loader.rs`
-What: read config.json (serde, no per-family defaults for required fields),
-mmap model.safetensors (+ index.json sharding for multi-file models), build
-`name -> (dtype, shape, byte range)` map, materialize bf16→f32 Tensors.
-Strict: every expected tensor present + shape-checked, unexpected = error
-(tied lm_head exempt). Path-traversal guard on shard names. Layer cap 10k.
-Proof: unit tests on a tiny synthetic safetensors file written by the test.
+### Step 3 — Loader: GGUF file → tensors `[M1]` (ADR 004)
+`nucleon/src/loader/` (module folder: container.rs, config.rs, dequant.rs, model.rs)
+What: mmap the .gguf, hand-parse the container (magic, VERSION CHECK =3
+else refuse, metadata key-values, tensor index, alignment), read the
+family's config numbers from metadata keys (no defaults), dequantize
+Q8_0 → f32 Tensors at load. Strict: every expected tensor present +
+shape-checked, unexpected = error; unsupported ggml dtype = clear
+error naming it. Facts: docs/research/gguf-qwen3.md (research first).
+Proof: unit tests on tiny synthetic GGUF files written by the tests;
+oracle cross-check against an existing GGUF-reading crate (dev-dep).
 
 ### Step 4 — Tokenizer: text ↔ ids `[M1]`
 `nucleon/src/tokenizer.rs`
-What: thin wrapper over `tokenizers`: load tokenizer.json, encode (never adds
-specials), streaming decode via `DecodeStream::step` (withholds partial
-UTF-8), token_to_id for EOS resolution. No BOS for Qwen — the chat template
+What: rebuild the tokenizer from GGUF metadata (token array, merges,
+byte-level BPE with the family's pre-tokenizer regex) into an
+in-memory `tokenizers` object — ADR 004 means no tokenizer.json on
+disk. Then the thin wrapper: encode (never adds specials), streaming
+decode via `DecodeStream::step` (withholds partial UTF-8),
+token_to_id for EOS resolution. No BOS for Qwen — the chat template
 is the single source of special tokens.
 Proof: round-trip tests incl. an emoji split across tokens (the U+FFFD case).
 
@@ -103,8 +111,10 @@ from prefill logits — no extra forward) → decode loop (sample → EOS check
 BEFORE detokenize → stream text out via callback) → stop reasons
 (EosToken/TokenLimit/Cancelled). Stop on both Qwen EOS ids. max_tokens=0
 honored before first sample.
-Proof: **the golden test** — fixed prompt, greedy, real Qwen3-0.6B weights →
-exact expected token ids (generated once with HF transformers as oracle).
+Proof: **the golden test** — fixed prompt, greedy, the real Q8_0 GGUF →
+exact expected token ids (oracle: HF transformers loading the SAME
+gguf file via its gguf_file support, dequantized f32 on both sides;
+verify support for qwen3 arch during research).
 This single test proves steps 1-8 jointly.
 
 ### Step 9 — CLI + chat template: usable `[M1 → tag m1-cpu-hello]`
@@ -130,14 +140,12 @@ backend (MetalBackend holds MTLBuffers; unified memory keeps copies free).
 Proof: **op-parity tests vs CpuBackend** (tolerance), then the same golden
 test on GPU, then a benchmark journal entry (tokens/s CPU vs GPU).
 
-### Step 12 — GGUF + quantization `[M3 → tag m3-quant]`
-`nucleon/src/loader/gguf.rs`, quant kernels
-What: GGUF container parse (we know it from higgs/gguf-rs-lib). GGUF is
-the ONLY quantized format nucleon will ever read (ADR 003; GPTQ/AWQ
-safetensors repos out of scope). Q8_0 first
-(simplest: scale+i8 blocks), then Q4_K. Dequant-on-load initially (correct,
-memory-hungry), then fused dequant-matmul kernels (fast). Runs the same
-files higgs serves.
+### Step 12 — More quant types + fused dequant `[M3 → tag m3-quant]`
+quant kernels; loader/dequant.rs grows
+What: the GGUF container landed at M1 (ADR 004); this step adds Q4_K
+(and friends as needed) plus the speed half: weights stay packed and
+fused dequant-matmul kernels read blocks directly, ending the
+dequant-on-load memory cost. Runs the same files higgs serves.
 Proof: parity tests quant vs f32 within tolerance; golden test on a quant model.
 
 ### Step 13 — Qwen3.8-27B: the qwen3_5 hybrid family `[M4 → tag m4-qwen38]`

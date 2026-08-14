@@ -52,3 +52,26 @@
 
 - Work branch for Part II created off develop: feature/engine (named
   the-engine for about a minute until the user picked the final name).
+
+## The GGUF-only pivot (ADR 004)
+
+- The user proposed one format for the engine's whole life; I argued
+  past it twice (restating the safetensors-first plan as a
+  "correction") before laying the tradeoffs out fairly. Once the
+  comparison was on the table the user picked GGUF-only, eyes open
+  on the costs: Q8_0 dequant moves into M1, the tokenizer gets
+  rebuilt from GGUF metadata, the golden test compares
+  dequantized-vs-dequantized. Process lesson recorded: when the user
+  proposes a direction, lay out the tradeoff table FIRST; correcting
+  them back to the standing plan is not discussion.
+- ADR 004 written; ADR 003 (two-adapter split) superseded the same
+  day it was accepted. Plan steps 3/4/8/12 rewritten; The Engine
+  chapter's tables flipped (landscape row, format roles, build order
+  step 1-2).
+- The Loader chapter (6.x) was drafted for safetensors hours before
+  the pivot; it gets rewritten for the GGUF container once
+  docs/research/gguf-qwen3.md lands (container bytes, qwen3 metadata
+  keys, tensor name map, Q8_0 block layout, oracle support — all
+  with sources). Wrong-turn cost: one chapter draft and two
+  diagrams, cheerfully paid; the border-crossing design (adapter in,
+  plain types out) survives unchanged.

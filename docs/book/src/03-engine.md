@@ -145,9 +145,9 @@ GGML/GGJT by GGUF):
 | format | from | since | shape | role for LLM weights today |
 |---|---|---|---|---|
 | pytorch .bin | PyTorch | 2016 | folder + sidecars | the old HF default; pickle-based, executes code on load; still on older repos |
-| safetensors | Hugging Face | 2022 | folder + sidecars | the HF default; what Part II reads |
+| safetensors | Hugging Face | 2022 | folder + sidecars | the HF release default; labs publish in it; nucleon does not read it (ADR 004) |
 | GGML / GGJT | llama.cpp | early 2023 | one file | GGUF's predecessors, superseded |
-| GGUF | llama.cpp | Aug 2023 | one file | the local/quantized world's default; Part III |
+| GGUF | llama.cpp | Aug 2023 | one file | the local/quantized world's default; nucleon's one and only format |
 | ONNX | Microsoft + Meta | 2017 | one graph file | cross-framework deployment; not how LLMs release weights |
 
 (Names like GPTQ and AWQ on HF are not containers: they are
@@ -164,7 +164,7 @@ configuration lives:
 | layout | 8 bytes of header length, JSON header (tensor name to dtype, shape, byte range), raw bytes | one self-describing file: metadata key-values plus tensors |
 | weights held as | bf16 here (full precision) | usually quantized (reduced precision) |
 | sits beside it | config.json, tokenizer files | nothing; metadata is inside |
-| nucleon reads it | this part, directly | Part III ([Quantization](12-quantization.md)) |
+| nucleon reads it | no: ADR 004 chose one format for the engine's whole life | yes, from day one; more quant types in Part III ([Quantization](12-quantization.md)) |
 
 One dtype word: bf16 is a 16-bit float with f32's exponent range and
 fewer fraction bits; the weights are stored in it. Part II converts to
@@ -208,7 +208,7 @@ hardware they bet on, and what they optimize for.
 | llama.cpp | ggml community | GGUF | CPU, Metal, CUDA, Vulkan | runs anywhere, quantized, single binary |
 | MLX | Apple | safetensors | Apple silicon only | unified-memory-native research and local use |
 | vLLM | UC Berkeley origin | safetensors | server GPUs (CUDA, ROCm) | serving many requests at once |
-| nucleon | this book | safetensors, then GGUF | Apple silicon (CPU + Metal) | readable pure Rust, every block a lesson |
+| nucleon | this book | GGUF | Apple silicon (CPU + Metal) | readable pure Rust, every block a lesson |
 
 Two rows explain nucleon's ancestry: llama.cpp proves a from-scratch
 engine can match the labs, and MLX proves Apple silicon rewards an
@@ -263,8 +263,9 @@ machine (the Apple M3 Max this book measures on).
 
 The steps, each a chapter:
 
-1. fetch the Qwen3-0.6B package;
-2. [The Loader](04-loader.md): folder in, checked f32 tensors out;
+1. fetch Qwen3-0.6B-Q8_0.gguf, the official one-file GGUF;
+2. [The Loader](04-loader.md): file in, checked f32 tensors out
+   (Q8_0 dequantized once, at load);
 3. [The Tokenizer](05-tokenizer.md): text to ids and back, safe to
    stream;
 4. the chat template: user text to ChatML, the conversation format

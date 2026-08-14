@@ -1,6 +1,8 @@
 # ADR 003: quantized weights come from GGUF only
 
-Date: 2026-08-14. Status: accepted (user decision).
+Date: 2026-08-14. Status: SUPERSEDED by ADR 004 (same day): the user
+chose GGUF as the only format for the whole engine, from day one; the
+two-adapter split below never got built.
 
 ## Decision
 
