@@ -169,10 +169,27 @@ The loader's tests pin this arithmetic.
 
 ## 6.6 The config struct
 
-`Qwen3Config` is filled from the metadata table in 6.3: typed values
-read by key name, no JSON anywhere. Missing key, wrong type, or
-`general.architecture != "qwen3"` each refuse with a named error. It
-reaches the engine wrapped as `FamilyConfig::Qwen3` (6.8), so the
+`Qwen3Config` is the typed twin of 6.3's metadata table: one field
+per key, filled at load, no JSON anywhere. Missing key, wrong type,
+or `general.architecture != "qwen3"` each refuse with a named error.
+
+```rust
+pub struct Qwen3Config {
+    pub num_hidden_layers: u32,       // qwen3.block_count           = 28
+    pub hidden_size: u32,             // qwen3.embedding_length      = 1024
+    pub intermediate_size: u32,       // qwen3.feed_forward_length   = 3072
+    pub num_attention_heads: u32,     // qwen3.attention.head_count  = 16
+    pub num_key_value_heads: u32,     // ...head_count_kv            = 8
+    pub head_dim: u32,                // ...key_length               = 128
+    pub rms_norm_eps: f32,            // ...layer_norm_rms_epsilon   = 1e-6
+    pub rope_theta: f32,              // qwen3.rope.freq_base        = 1e6
+    pub max_position_embeddings: u32, // qwen3.context_length        = 40960
+    pub vocab_size: u32,              // tokens array length         = 151936
+    pub eos_token_id: u32,            // tokenizer.ggml.eos_token_id = 151645
+}
+```
+
+It reaches the engine wrapped as `FamilyConfig::Qwen3` (6.8), so the
 qwen3-specific part of the bundle is exactly one enum variant, and
 nothing family-flavored leaks anywhere else.
 
@@ -248,7 +265,7 @@ pub struct Yamf {
     pub family: FamilyConfig,
     pub tensors: HashMap<String, Tensor>,
     pub tokenizer: TokenizerData,
-    pub chat_template: String,
+    pub chat_template: ChatTemplate,
 }
 
 pub enum FamilyConfig {
@@ -275,8 +292,8 @@ Each piece, what it is for, and where the idea was stolen from:
 | `tensors` | all 310 weights as f32 `Tensor`s, dims un-reversed, shapes already checked | the forward pass | safetensors' up-front inventory: the full tensor list is verified complete before this struct can exist |
 | `tokenizer` | tokens, merges, token types, the pre id, the eos id, as plain vectors | The Tokenizer chapter | GGUF's bundle idea: the tokenizer travels with the weights, nothing external needed |
 | `tokenizer.pre` | "qwen2", the tag naming which split regex to build | the tokenizer build | GGUF's architecture-tag pattern: a small tag tells you how to read the rest |
-| `chat_template` | the 4100-character ChatML template string | the chat module (the CLI calls it later) | GGUF's bundle again: the conversation format ships inside the model file |
-| the struct as a whole | inert data only: no file handles, no logic, nothing executable; IO is fully over when `load` returns | everything downstream | safetensors' dumbness-as-a-virtue, plus two rejections: ONNX's program-carrying (family code is our program) and pickle's executability (nothing crossing the gate can act) |
+| `chat_template` | the ChatML template, parsed and validated at the gate: `ChatTemplate` wraps a [minijinja](https://docs.rs/minijinja) environment holding the compiled template (minijinja is the established pure-Rust Jinja engine, by Jinja's original author). A broken template fails at load, not at first chat | the chat module (the CLI calls it later) | GGUF's bundle again, plus the gate philosophy: validate everything the moment it enters |
+| the struct as a whole | inert: no file handles, no logic; IO is fully over when `load` returns. Nothing from the file ever runs as code; the chat template is parsed into a sandboxed description at the gate, which is validation, not execution | everything downstream | safetensors' dumbness-as-a-virtue, plus two rejections: ONNX's program-carrying (family code is our program) and pickle's executability |
 
 `TokenizerData`'s shape is not qwen3-specific: it is the shape of
 every byte-level BPE tokenizer (GGUF's tokenizer model "gpt2"; Llama

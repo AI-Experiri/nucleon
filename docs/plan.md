@@ -20,7 +20,8 @@ built, tested, journaled before the next begins.
 **Tech stack:** memmap2 (the GGUF parser is nucleon's own code;
 candle-core 0.11 as dev-dep test oracle only), tokenizers 0.23
 (default-features=false, fancy-regex — onig is C; tokenizer rebuilt
-from GGUF metadata), half 2.7 (fp16 block scales), objc2-metal 0.3.
+from GGUF metadata), half 2.7 (fp16 block scales), minijinja (chat template parsed and
+validated at the gate — user decision), objc2-metal 0.3.
 serde_json dropped: config comes from typed GGUF metadata, not JSON.
 Grounding facts: `docs/research/*.md`. Each step below gets its own detailed
 task plan (with code) when we reach it; this document is the map.
@@ -120,9 +121,9 @@ This single test proves steps 1-8 jointly.
 
 ### Step 9 — CLI + chat template: usable `[M1 → tag m1-cpu-hello]`
 `nucleon/src/bin/nucleon.rs`, `nucleon/src/chat.rs`
-What: `nucleon run --model <dir> --prompt "…" [--raw]` — ChatML rendering
-(hardcoded Qwen template first; minijinja is a later step if ever), streamed
-output, tokens/sec report. Integration test in `tests/` spawns the real CLI.
+What: `nucleon run --model <file.gguf> --prompt "…" [--raw]` — ChatML
+rendered through the minijinja template already parsed into the Yamf
+at load, streamed output, tokens/sec report. Integration test in `tests/` spawns the real CLI.
 **Milestone: coherent text from Qwen3-0.6B on CPU.** Slow is fine (~f32 0.6B
 ≈ a few tokens/s) — correctness is the deliverable; speed is M2's job.
 
