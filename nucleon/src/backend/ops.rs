@@ -18,8 +18,8 @@ use crate::tensor::Tensor;
 /// - INNER dimensions that ops divide or stride by (matvec input length,
 ///   matmul inner dim, rope head_dim, embed dim, every attention dim)
 ///   must be nonzero and panic otherwise.
-/// - Zero-sized OUTER shapes (empty elementwise inputs, zero output
-///   rows) are valid and return empty results.
+/// - Zero-sized OUTER shapes (empty elementwise inputs incl. rmsnorm
+///   and softmax, zero output rows) are valid and return empty results.
 /// - Dimensions near u32::MAX are out of contract: GPU index math is
 ///   32-bit and backends may reject them. Real model shapes sit orders
 ///   of magnitude below the cap.

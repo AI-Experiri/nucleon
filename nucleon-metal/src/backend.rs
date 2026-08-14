@@ -48,7 +48,11 @@ impl Backend for MetalBackend {
     fn matvec(&self, w: &Tensor, x: &Tensor) -> Tensor {
         assert_eq!(w.shape().len(), 2, "weights must be [out_dim, in_dim]");
         assert_eq!(x.shape().len(), 1, "matvec input must be a 1-D vector");
-        assert_eq!(w.shape()[1], x.len(), "weight columns must match input");
+        assert_eq!(
+            w.shape()[1],
+            x.len(),
+            "weight columns must match input length"
+        );
         Tensor::new(vec![w.shape()[0]], self.ops.matvec(w.data(), x.data()))
     }
 

@@ -384,3 +384,15 @@ fn fused_kernel_rejects_out_of_contract_shapes() {
         "got: {msg}"
     );
 }
+
+#[test]
+#[should_panic(expected = "exceeds u32")]
+fn dim_u32_rejects_oversized_dimensions() {
+    dim_u32(usize::MAX);
+}
+
+#[test]
+#[should_panic(expected = "stride wrap")]
+fn reduction_dim_u32_rejects_near_cap_dimensions() {
+    reduction_dim_u32(u32::MAX as usize);
+}

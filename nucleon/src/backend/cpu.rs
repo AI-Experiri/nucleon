@@ -87,6 +87,10 @@ impl Backend for CpuBackend {
 
     fn rmsnorm(&self, x: &Tensor, weight: &Tensor, eps: f32) -> Tensor {
         assert_eq!(x.shape(), weight.shape(), "rmsnorm needs matching shapes");
+        if x.is_empty() {
+            // valid empty-outer case; also avoids a meaningless 0/0 below
+            return Tensor::new(x.shape().to_vec(), Vec::new());
+        }
         let mut sum_sq = 0.0;
         for &v in x.data() {
             sum_sq += v * v;

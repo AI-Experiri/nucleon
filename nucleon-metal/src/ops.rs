@@ -204,7 +204,7 @@ impl MetalOps {
     /// that are entirely NaN and/or -inf return index 0. Fine for greedy
     /// sampling, where -inf marks deliberately masked-out tokens.
     pub fn argmax(&self, x: &[f32]) -> u32 {
-        assert!(!x.is_empty());
+        assert!(!x.is_empty(), "argmax needs a nonempty input");
         reduction_dim_u32(x.len()); // validate before allocating buffers
         let xb = self.gpu.buffer_from_f32(x);
         let out = self.gpu.buffer_for_output(1);
@@ -272,7 +272,7 @@ impl MetalOps {
             head_dim > 0 && seq > 0 && n_heads > 0 && n_kv_heads > 0,
             "attention dims must be nonzero (empty cache?)"
         );
-        assert!(seq <= 4096, "attention kernel caps seq at 4096");
+        assert!(seq <= 4096, "attention contract caps seq at 4096");
         let q_elems = n_heads.checked_mul(head_dim).expect("q size overflows");
         let kv_elems = n_kv_heads
             .checked_mul(seq)

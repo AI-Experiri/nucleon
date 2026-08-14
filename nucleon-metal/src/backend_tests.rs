@@ -171,18 +171,47 @@ fn zero_sized_outer_shapes_agree_across_backends() {
     let Some(gpu) = gpu() else { return };
     let cpu = CpuBackend;
 
+    fn same(a: &Tensor, b: &Tensor) {
+        assert_eq!(a.shape(), b.shape());
+        assert_eq!(a.data(), b.data());
+    }
     let empty = Tensor::zeros(vec![0]);
-    assert_eq!(gpu.add(&empty, &empty).len(), cpu.add(&empty, &empty).len());
-    assert_eq!(gpu.silu(&empty).len(), cpu.silu(&empty).len());
-    assert_eq!(gpu.softmax(&empty).len(), cpu.softmax(&empty).len());
+    same(&gpu.add(&empty, &empty), &cpu.add(&empty, &empty));
+    same(&gpu.mul(&empty, &empty), &cpu.mul(&empty, &empty));
+    same(&gpu.silu(&empty), &cpu.silu(&empty));
+    same(&gpu.softmax(&empty), &cpu.softmax(&empty));
+    same(
+        &gpu.rmsnorm(&empty, &empty, 1e-6),
+        &cpu.rmsnorm(&empty, &empty, 1e-6),
+    );
 
     let w = Tensor::zeros(vec![0, 3]); // zero output rows
     let x = Tensor::zeros(vec![3]);
-    assert_eq!(gpu.matvec(&w, &x).len(), cpu.matvec(&w, &x).len());
+    same(&gpu.matvec(&w, &x), &cpu.matvec(&w, &x));
+
+    let a = Tensor::zeros(vec![0, 3]);
+    let b = Tensor::zeros(vec![2, 3]);
+    same(&gpu.matmul(&a, &b), &cpu.matmul(&a, &b));
 
     let no_heads = Tensor::zeros(vec![0, 8]);
-    assert_eq!(
-        gpu.rope(&no_heads, 3, 1e6).len(),
-        cpu.rope(&no_heads, 3, 1e6).len()
-    );
+    same(&gpu.rope(&no_heads, 3, 1e6), &cpu.rope(&no_heads, 3, 1e6));
+}
+
+#[test]
+fn attention_rejects_every_zero_dim() {
+    let Some(gpu) = gpu() else { return };
+    // zero seq
+    let q = Tensor::zeros(vec![1, 2]);
+    let kv = Tensor::zeros(vec![1, 0, 2]);
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.attention(&q, &kv, &kv, 1.0);
+    }));
+    assert!(msg.contains("nonzero"), "got: {msg}");
+    // zero heads
+    let q = Tensor::zeros(vec![0, 2]);
+    let kv = Tensor::zeros(vec![0, 1, 2]);
+    let msg = panic_message(std::panic::AssertUnwindSafe(|| {
+        gpu.attention(&q, &kv, &kv, 1.0);
+    }));
+    assert!(msg.contains("nonzero"), "got: {msg}");
 }
