@@ -218,14 +218,44 @@ unmodified; our invariant is a local file nobody rewrites mid-run.
 
 ## 6.8 The API
 
+The rule the API enforces: nothing GGUF-shaped crosses the border.
+The loader distills the file into exactly what the engine needs, in
+plain types; every "not supported" refusal happens here, before the
+engine sees anything; whatever else the file carries is dropped. No
+other module ever receives raw metadata.
+
 ```rust
 pub struct LoadedModel {
     pub config: Qwen3Config,
     pub tensors: HashMap<String, Tensor>,
+    pub tokenizer: TokenizerData,   // consumed by The Tokenizer
+    pub chat_template: String,      // consumed by The CLI
+}
+
+pub struct TokenizerData {
+    pub tokens: Vec<String>,          // 151936 entries
+    pub merges: Vec<(String, String)>,
+    pub token_types: Vec<TokenType>,  // normal / control / unused ...
+    pub eos_token_id: u32,
 }
 
 pub fn load(path: &Path) -> Result<LoadedModel, LoaderError>
 ```
+
+The tokenizer block receives those plain vectors, never the file; if
+the tokenizer chapter ever needs one more piece, the loader grows one
+more field, and the border stays where it is.
+
+Two properties this struct must keep as it grows:
+
+- extensible: fields are added, never repurposed; when a second
+  family arrives, the family-specific part (`Qwen3Config`) moves
+  behind the families seam and the rest stays put;
+- versioned by the compiler: an in-memory struct needs no version
+  number, because every consumer is type-checked against the current
+  definition at build time; drift is impossible. A version field
+  becomes necessary the day this struct is ever written to disk,
+  which is exactly why we do not have a nucleon disk format.
 
 > **Rust: `HashMap<K, V>`.** The standard hash table: owned keys to
 > owned values, `get` returns `Option`. Sibling: `BTreeMap` when
