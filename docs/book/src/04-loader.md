@@ -45,6 +45,12 @@ infos, then zero-padding to the alignment (32 unless the metadata says
 otherwise; 28 pad bytes here), then the tensor data region, which
 starts at byte 5,951,136 in this file.
 
+Naming collision warning: "KV" here means key-value pair, a named
+entry in the file's dictionary. It has nothing to do with the KV
+cache from [the map chapter](00-big-picture.md#12-the-kv-cache),
+which is runtime memory of attention key and value vectors; that
+cache does not exist until generation runs.
+
 The building blocks:
 
 - string: a u64 byte length, then that many UTF-8 bytes, never
