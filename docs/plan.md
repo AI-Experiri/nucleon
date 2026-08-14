@@ -132,7 +132,9 @@ test on GPU, then a benchmark journal entry (tokens/s CPU vs GPU).
 
 ### Step 12 — GGUF + quantization `[M3 → tag m3-quant]`
 `nucleon/src/loader/gguf.rs`, quant kernels
-What: GGUF container parse (we know it from higgs/gguf-rs-lib), Q8_0 first
+What: GGUF container parse (we know it from higgs/gguf-rs-lib). GGUF is
+the ONLY quantized format nucleon will ever read (ADR 003; GPTQ/AWQ
+safetensors repos out of scope). Q8_0 first
 (simplest: scale+i8 blocks), then Q4_K. Dequant-on-load initially (correct,
 memory-hungry), then fused dequant-matmul kernels (fast). Runs the same
 files higgs serves.
