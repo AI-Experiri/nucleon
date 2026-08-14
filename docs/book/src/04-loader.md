@@ -171,7 +171,10 @@ The loader's tests pin this arithmetic.
 
 `Qwen3Config` is filled from the metadata table in 6.3: typed values
 read by key name, no JSON anywhere. Missing key, wrong type, or
-`general.architecture != "qwen3"` each refuse with a named error.
+`general.architecture != "qwen3"` each refuse with a named error. It
+reaches the engine wrapped as `FamilyConfig::Qwen3` (6.8), so the
+qwen3-specific part of the bundle is exactly one enum variant, and
+nothing family-flavored leaks anywhere else.
 
 > **Rust: `Result<T, E>` and `?`.** A function that can fail returns
 > `Result`: `Ok(value)` or `Err(error)`; `?` unwraps the `Ok` or
@@ -242,10 +245,15 @@ module ever receives raw metadata. This is how it looks:
 
 ```rust
 pub struct Yamf {
-    pub config: Qwen3Config,
+    pub family: FamilyConfig,
     pub tensors: HashMap<String, Tensor>,
     pub tokenizer: TokenizerData,
     pub chat_template: String,
+}
+
+pub enum FamilyConfig {
+    Qwen3(Qwen3Config),
+    // a second family = a second variant; nothing else in Yamf moves
 }
 
 pub struct TokenizerData {
@@ -263,7 +271,7 @@ Each piece, what it is for, and where the idea was stolen from:
 
 | piece | holds | consumed by | stolen from |
 |---|---|---|---|
-| `config` | the family's dimension numbers as typed values (u32 layer count, f32 epsilon), read by key name | the Qwen3 forward pass | GGUF's typed metadata: values carry their types, and the compiler keeps enforcing them after the file is gone |
+| `family` | the ONE family-specific corner: a tag (which family) wrapping that family's typed numbers (`Qwen3Config`: u32 layer count, f32 epsilon). Everything else in Yamf is family-agnostic | the family's forward pass | GGUF's architecture tag (a tag namespaces the rest) becomes the enum tag; GGUF's typed metadata becomes compiler-checked fields |
 | `tensors` | all 310 weights as f32 `Tensor`s, dims un-reversed, shapes already checked | the forward pass | safetensors' up-front inventory: the full tensor list is verified complete before this struct can exist |
 | `tokenizer` | tokens, merges, token types, the pre id, the eos id, as plain vectors | The Tokenizer chapter | GGUF's bundle idea: the tokenizer travels with the weights, nothing external needed |
 | `tokenizer.pre` | "qwen2", the tag naming which split regex to build | the tokenizer build | GGUF's architecture-tag pattern: a small tag tells you how to read the rest |
@@ -275,14 +283,13 @@ every byte-level BPE tokenizer (GGUF's tokenizer model "gpt2"; Llama
 3 ships the same shape, different contents). The values are Qwen3's,
 and `pre` is the one family-flavored field. A different tokenizer
 kind (SentencePiece, GGUF model "llama", scores instead of merges)
-would grow a variant here, the same way a second family will split
-`Qwen3Config` behind the families seam.
+would grow a variant here, the same way `FamilyConfig` grows one.
 
 Two properties this struct must keep as it grows:
 
-- extensible: fields are added, never repurposed; when a second
-  family arrives, the family-specific part (`Qwen3Config`) moves
-  behind the families seam and the rest stays put;
+- extensible: fields are added, never repurposed; the family-specific
+  part is already quarantined in `FamilyConfig`, so a second family
+  is a new variant and the rest of Yamf never changes;
 - versioned by the compiler: an in-memory struct needs no version
   number, because every consumer is type-checked against the current
   definition at build time; drift is impossible. A version field
