@@ -1,0 +1,45 @@
+<svg width="700" height="340" viewBox="0 0 700 340" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrT" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <text x="350" y="30" text-anchor="middle" fill="#c0cadb" font-size="14">model.safetensors, byte by byte</text>
+
+  <!-- the three segments -->
+  <rect x="30" y="50" width="110" height="60" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="85" y="75" text-anchor="middle" font-size="12" fill="#c0cadb">header length</text>
+  <text x="85" y="93" text-anchor="middle" font-size="11" opacity="0.7">u64, little-endian</text>
+
+  <rect x="140" y="50" width="200" height="60" rx="6" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="240" y="75" text-anchor="middle" font-size="12" fill="#f0c893">JSON header</text>
+  <text x="240" y="93" text-anchor="middle" font-size="11" opacity="0.7">name -&gt; dtype, shape, offsets</text>
+
+  <rect x="340" y="50" width="330" height="60" rx="6" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="505" y="75" text-anchor="middle" font-size="12" fill="#c0cadb">raw tensor data</text>
+  <text x="505" y="93" text-anchor="middle" font-size="11" opacity="0.7">offsets count from here</text>
+
+  <!-- byte offset ticks -->
+  <text x="30" y="130" font-size="11" opacity="0.7">0</text>
+  <text x="140" y="130" font-size="11" opacity="0.7">8</text>
+  <text x="340" y="130" font-size="11" opacity="0.7">8 + N</text>
+  <text x="668" y="130" text-anchor="end" font-size="11" opacity="0.7">end of file</text>
+
+  <!-- one tensor's slice inside the data region -->
+  <rect x="360" y="54" width="90" height="52" rx="4" fill="rgba(224,164,88,0.18)" stroke="#e0a458" stroke-opacity="0.9"/>
+
+  <!-- zoom card: one header entry -->
+  <rect x="60" y="160" width="440" height="130" rx="10" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5"/>
+  <text x="80" y="186" font-size="12" fill="#c0cadb">"model.embed_tokens.weight": {</text>
+  <text x="100" y="208" font-size="12" fill="#c0cadb">"dtype": "BF16",</text>
+  <text x="100" y="230" font-size="12" fill="#c0cadb">"shape": [151936, 1024],</text>
+  <text x="100" y="252" font-size="12" fill="#c0cadb">"data_offsets": [0, 311164928]</text>
+  <text x="80" y="274" font-size="12" fill="#c0cadb">}</text>
+
+  <!-- arrow from the entry to its bytes -->
+  <path d="M 505 252 C 580 250, 420 130, 402 112" stroke="#e0a458" stroke-opacity="0.8" fill="none" marker-end="url(#arrT)"/>
+  <text x="560" y="240" font-size="11" fill="#f0c893">these bytes</text>
+
+  <text x="350" y="322" text-anchor="middle" font-size="12" opacity="0.75">151936 x 1024 values x 2 bytes (bf16) = 311,164,928 bytes</text>
+</svg>
