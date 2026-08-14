@@ -1,5 +1,9 @@
 # The Loader
 
+<div class="warn">
+<p>This chapter is mid-rewrite. ADR 004 (GGUF is nucleon's only format) landed after this draft was written for safetensors. Section 6.1's job and border design stand; the byte-format sections below still describe safetensors and are being replaced with the GGUF container once the research notes land.</p>
+</div>
+
 The first block of Part II. It runs once, at startup, and crosses the
 border drawn in [The Engine](03-engine.md): the file world on one
 side, the engine's plain types on the other. This chapter is the

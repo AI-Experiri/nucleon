@@ -61,8 +61,9 @@ the cache is a trait, and families own every model-specific decision.
 
 `qwen3`'s numbers, from the real
 [config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json)
-(also as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json),
-the exact bytes our loader reads):
+(also as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json)).
+nucleon reads these same numbers from the GGUF file's metadata keys
+(ADR 004); config.json stays the human-readable reference:
 
 | config.json field | Qwen3-0.6B |
 |---|---|
@@ -77,8 +78,11 @@ the exact bytes our loader reads):
 
 ## 5.3 The package on disk
 
-A checkpoint downloads as a folder
-([browse Qwen3-0.6B's](https://huggingface.co/Qwen/Qwen3-0.6B/tree/main)):
+A checkpoint's official release downloads as a folder
+([browse Qwen3-0.6B's](https://huggingface.co/Qwen/Qwen3-0.6B/tree/main)).
+nucleon consumes the GGUF conversion of it instead — one file, ADR
+004 — but the release folder is where every piece is defined, and
+GGUF's metadata mirrors exactly these files:
 
 | file | role |
 |---|---|
@@ -154,8 +158,8 @@ GGML/GGJT by GGUF):
 quantization methods, and those repos still ship safetensors files
 holding the quantized values.)
 
-The two nucleon reads, in detail; the difference is where the
-configuration lives:
+The two lineage winners in detail; nucleon reads only the right-hand
+column (ADR 004). The difference is where the configuration lives:
 
 <div class="diagram"><img src="diagrams/formats-layout.svg" alt="safetensors folder with sidecar jsons vs GGUF single self-describing file"></div>
 
@@ -192,7 +196,7 @@ has nothing to version. Our strict loader contract in 5.6 is the
 substitute.
 
 <div class="note">
-<p>Where the formats come from: safetensors is Hugging Face's own format, built in 2022 to replace pickle-based PyTorch checkpoint files, which can execute arbitrary code when loaded. Its reference implementation is written in Rust, and our loader uses that exact crate (<a href="https://huggingface.co/docs/safetensors/index">format docs</a>, <a href="https://github.com/huggingface/safetensors">source</a>).</p>
+<p>Where the formats come from: safetensors is Hugging Face's own format, built in 2022 to replace pickle-based PyTorch checkpoint files, which can execute arbitrary code when loaded. Its reference implementation is written in Rust (<a href="https://huggingface.co/docs/safetensors/index">format docs</a>, <a href="https://github.com/huggingface/safetensors">source</a>).</p>
 <p>GGUF comes from the llama.cpp project (August 2023, replacing its earlier GGML and GGJT files): one self-describing file carrying weights and all metadata as key-value pairs (dimensions, even the whole tokenizer), so nothing sits beside it. Unlike config.json, GGUF has an actual written <a href="https://github.com/ggml-org/ggml/blob/master/docs/gguf.md">specification</a>.</p>
 </div>
 
@@ -218,12 +222,15 @@ engine built for unified memory. nucleon takes both bets in Rust.
 
 The loader's contract, strict on purpose:
 
-1. every tensor the config promises is present, with the exact shape;
-2. any tensor the config does not explain is an error (one exception:
-   the tied lm_head copy, byte-identical to the embedding table);
-3. bf16 converts to f32 once, at load;
-4. nothing from the file is trusted: byte ranges bounds-checked, sizes
-   checked-multiplied, shard names path-checked.
+1. the GGUF version and `general.architecture` are checked first;
+   unsupported values are refused by name;
+2. every tensor the metadata's dimension keys imply is present, with
+   the exact expected shape; any tensor the family does not explain
+   is an error;
+3. quantized blocks (Q8_0 first) dequantize to f32 once, at load; a
+   quant type we do not implement yet is a clear error, not a crash;
+4. nothing from the file is trusted: offsets bounds-checked, sizes
+   checked-multiplied, array lengths sanity-capped.
 
 Why strict: a missing or misshapen weight does not crash a
 transformer; it generates fluent, wrong tokens. Fail at load, not
@@ -275,9 +282,9 @@ The steps, each a chapter:
 6. [The Loop](09-generate.md), naive on purpose: no cache, each step
    re-runs the whole sequence; greedy pick; stop on ids 151645 and
    151643; tokens/sec recorded as the baseline;
-7. the golden test: same prompt through HF transformers, greedy both
-   sides, ids match exactly; on mismatch, diff hidden states layer by
-   layer and fix the first divergence;
+7. the golden test: same prompt through HF transformers loading the
+   same GGUF file, greedy both sides, ids match exactly; on mismatch,
+   diff hidden states layer by layer and fix the first divergence;
 8. improvements, one at a time, each measured:
    [The Cache](06-cache.md) removes step 6's re-work, then GPU
    residency, fused kernels, bf16 compute, quantized weights
