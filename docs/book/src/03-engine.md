@@ -104,30 +104,28 @@ library, which writes the file when a lab saves its model:
 So reading the config is the first step of supporting any model, every
 time, and it always carries surprises:
 
-1. Qwen3-0.6B: `head_dim: 128` explicit, while hidden/heads = 64.
-   Compute instead of read, and every weight loads, then the model
-   generates garbage.
-2. Qwen3.8-27B: one generation later, same lab, new fields qwen3 never
-   had: `full_attention_interval: 4`, `partial_rotary_factor: 0.25`.
-3. DeepSeek-V2-Lite: `q_lora_rank: null` turns a whole projection
-   block off; the larger checkpoint of the same `model_type` has it
-   on.
+| model | config field | the surprise |
+|---|---|---|
+| Qwen3-0.6B | `head_dim: 128` | explicit, while hidden/heads = 64; compute it instead of reading it and every weight loads, then the model generates garbage |
+| Qwen3.8-27B | `full_attention_interval: 4`, `partial_rotary_factor: 0.25` | same lab, one generation later: fields qwen3 never had |
+| DeepSeek-V2-Lite | `q_lora_rank: null` | one nullable field switches a whole projection block off; the larger checkpoint of the same `model_type` has it on |
 
 It is also why our loader takes no defaults for required fields: with
 no standard to fall back on, a value the file does not state is an
 error, not a guess.
 
-Format and dtype words for the table above:
+The two weight containers this book reads:
 
-- safetensors: the weights container. 8 bytes of header length, a JSON
-  header mapping tensor name to dtype, shape, and byte range, then raw
-  bytes. Our loader parses it directly.
-- GGUF: llama.cpp's single-file container, usually holding quantized
-  (reduced-precision) weights. Part III
-  ([Quantization](12-quantization.md)).
-- bf16: a 16-bit float with f32's exponent range and fewer fraction
-  bits; what the weights are stored in. Part II converts to f32 at
-  load; computing in bf16 is Part III.
+| | safetensors | GGUF |
+|---|---|---|
+| layout | 8 bytes of header length, JSON header (tensor name to dtype, shape, byte range), raw bytes | one self-describing file: metadata key-values plus tensors |
+| weights held as | bf16 here (full precision) | usually quantized (reduced precision) |
+| sits beside it | config.json, tokenizer files | nothing; metadata is inside |
+| nucleon reads it | this part, directly | Part III ([Quantization](12-quantization.md)) |
+
+One dtype word: bf16 is a 16-bit float with f32's exponent range and
+fewer fraction bits; the weights are stored in it. Part II converts to
+f32 at load; computing in bf16 is Part III.
 
 <div class="note">
 <p>Where the formats come from: safetensors is Hugging Face's own format, built in 2022 to replace pickle-based PyTorch checkpoint files, which can execute arbitrary code when loaded. Its reference implementation is written in Rust, and our loader uses that exact crate (<a href="https://huggingface.co/docs/safetensors/index">format docs</a>, <a href="https://github.com/huggingface/safetensors">source</a>).</p>

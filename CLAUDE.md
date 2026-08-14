@@ -98,9 +98,10 @@ watching it happen. Therefore:
   applies to the book, replies, and docs alike. Memory layouts, data
   flows, hardware structure, execution timelines, thread grids: draw
   them (ASCII). Prose supports the diagram, not the other way around.
-- Model/family facts (sizes, dims, layer maps, cross-model
-  comparisons) always render as a table or diagram, never prose
-  bullets (user hard rule).
+- COMPARISONS ARE TABLES (user hard rule): whenever two or more
+  things are being compared or contrasted — models, families,
+  formats, options, measurements — render a table or diagram, never
+  prose. Same for model/family fact sheets (sizes, dims, layer maps).
 - Book rendering conventions (theme/rust-notes.css): blockquotes are the
   Rust boxes (crab label, orange); diagrams render as labeled steel-blue
   cards, either ```text fences (ASCII) or inline SVG wrapped in
