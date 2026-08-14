@@ -46,6 +46,7 @@ impl Backend for CpuBackend {
 
     fn matvec(&self, w: &Tensor, x: &Tensor) -> Tensor {
         assert_eq!(w.shape().len(), 2, "weights must be [out_dim, in_dim]");
+        assert_eq!(x.shape().len(), 1, "matvec input must be a 1-D vector");
         assert_eq!(
             w.shape()[1],
             x.len(),
@@ -70,7 +71,8 @@ impl Backend for CpuBackend {
         assert_eq!(a.shape()[1], b.shape()[1], "inner dims must match");
         assert!(a.shape()[1] > 0, "matmul inner dim must be nonzero");
         let (m, n) = (a.shape()[0], b.shape()[0]);
-        let mut c = Vec::with_capacity(m * n);
+        let out_len = m.checked_mul(n).expect("matmul output size overflows");
+        let mut c = Vec::with_capacity(out_len);
         for i in 0..m {
             for j in 0..n {
                 let mut sum = 0.0;
@@ -204,7 +206,7 @@ impl Backend for CpuBackend {
                 best_idx = i;
             }
         }
-        best_idx as u32
+        u32::try_from(best_idx).expect("argmax index exceeds u32")
     }
 }
 

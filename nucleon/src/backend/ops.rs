@@ -13,10 +13,13 @@
 
 use crate::tensor::Tensor;
 
-/// Contract for every op: all dimensions are nonzero. Zero-sized shapes
-/// are upstream bugs (an empty cache, a malformed config) and panic
-/// identically on every backend, so generic code cannot pass on one
-/// executor and die on another.
+/// Shape contract, identical on every backend so generic code cannot
+/// pass on one executor and die on another:
+/// - INNER dimensions that ops divide or stride by (matvec input length,
+///   matmul inner dim, rope head_dim, embed dim, every attention dim)
+///   must be nonzero and panic otherwise.
+/// - Zero-sized OUTER shapes (empty elementwise inputs, zero output
+///   rows) are valid and return empty results.
 pub trait Backend {
     /// Elementwise a + b. Shapes must match.
     fn add(&self, a: &Tensor, b: &Tensor) -> Tensor;

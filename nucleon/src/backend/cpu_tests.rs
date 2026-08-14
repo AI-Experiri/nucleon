@@ -221,3 +221,10 @@ fn matmul_rejects_zero_inner_dim() {
 fn rope_rejects_zero_head_dim() {
     CpuBackend.rope(&Tensor::zeros(vec![2, 0]), 1, 1e6);
 }
+
+#[test]
+#[should_panic(expected = "1-D vector")]
+fn matvec_rejects_non_vector_input() {
+    // a [2,2] tensor must not silently flatten into a 4-vector
+    CpuBackend.matvec(&Tensor::zeros(vec![4, 4]), &Tensor::zeros(vec![2, 2]));
+}
