@@ -218,6 +218,14 @@ unmodified; our invariant is a local file nobody rewrites mid-run.
 
 ## 6.8 The API
 
+The loader's output struct has a name: `Yatf`, for Yet Another
+Tensor Format. The name is a joke with the irony fully intended, and
+it is load-bearing in reverse: a YATF is not a format (it lives only
+in memory, is never serialized, and has no version bytes) and it
+holds more than tensors (config, tokenizer data, the chat template).
+It commemorates the format zoo of The Engine's 5.4 while refusing to
+join it.
+
 The rule the API enforces: nothing GGUF-shaped crosses the border.
 The loader distills the file into exactly what the engine needs, in
 plain types; every "not supported" refusal happens here, before the
@@ -225,7 +233,7 @@ engine sees anything; whatever else the file carries is dropped. No
 other module ever receives raw metadata.
 
 ```rust
-pub struct LoadedModel {
+pub struct Yatf {
     pub config: Qwen3Config,
     pub tensors: HashMap<String, Tensor>,
     pub tokenizer: TokenizerData,   // consumed by The Tokenizer
@@ -239,7 +247,7 @@ pub struct TokenizerData {
     pub eos_token_id: u32,
 }
 
-pub fn load(path: &Path) -> Result<LoadedModel, LoaderError>
+pub fn load(path: &Path) -> Result<Yatf, LoaderError>
 ```
 
 The tokenizer block receives those plain vectors, never the file; if
@@ -269,7 +277,7 @@ Module layout, one concern per file, each with sibling tests:
 | loader/container.rs | 6.2: header, metadata KVs, tensor infos, alignment |
 | loader/config.rs | 6.3: metadata keys to Qwen3Config |
 | loader/dequant.rs | 6.5: Q8_0 blocks to f32 |
-| loader/model.rs | 6.7: expected names, checks, LoadedModel |
+| loader/yatf.rs | 6.7: expected names, checks, the Yatf bundle |
 
 The parser existing also makes `nucleon inspect model.gguf` nearly
 free: print version, architecture, dimensions, tensor types, and a
