@@ -63,7 +63,13 @@ UTF-8), token_to_id for EOS resolution. No BOS for Qwen — the chat template
 is the single source of special tokens.
 Proof: round-trip tests incl. an emoji split across tokens (the U+FFFD case).
 
-### Step 5 — KV cache `[M1]`
+### Step 5 — KV cache: the measured fix `[M1]`
+NOTE (user decision, 2026-08-14): built AFTER first tokens, not before.
+Steps 6-8 run cache-free first — the loop reprocesses the whole
+sequence each token (correct, visibly decelerating). This step then
+lands the cache as an optimization with a before/after tokens/sec
+table, the same naive-then-measure pattern as the fusion lesson.
+### (was) Step 5 — KV cache `[M1]`
 `nucleon/src/cache.rs`
 What: `KvCache` per layer: append k/v rows, expose contiguous views +
 `offset()` (= RoPE position). Plain growable f32 buffers, layout

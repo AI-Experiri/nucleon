@@ -14,12 +14,12 @@
 
 # Part II: The engine
 
-- [The Loader](04-loader.md)
 - [The Tokenizer](05-tokenizer.md)
-- [The Cache](06-cache.md)
+- [The Loader](04-loader.md)
 - [Qwen3](07-qwen3.md)
-- [The Sampler](08-sampler.md)
 - [The Loop](09-generate.md)
+- [The Cache](06-cache.md)
+- [The Sampler](08-sampler.md)
 - [The CLI](10-cli.md)
 
 # Part III: Speed and new models
