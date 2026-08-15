@@ -2,8 +2,8 @@
 
 The first block of Part II. It runs once, at startup, and crosses the
 border drawn in [Reading the Model](03-reading-the-model.md): one
-GGUF file on one side, the engine's plain types on the other. This chapter is the
-design; the build follows it. Every number below was verified against
+GGUF file on one side, the engine's plain types on the other. This
+chapter is the design; the build follows it. Every number below was verified against
 the real file's bytes (docs/research/gguf-qwen3.md carries the
 sources).
 

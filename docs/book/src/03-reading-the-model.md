@@ -39,7 +39,7 @@ A checkpoint's official release downloads as a folder
 
 | file | role |
 |---|---|
-| [config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json) | the family name and every dimension number |
+| [config.json](https://huggingface.co/Qwen/Qwen3-0.6B/blob/main/config.json) (also as [raw JSON](https://huggingface.co/Qwen/Qwen3-0.6B/raw/main/config.json)) | the family name and every dimension number |
 | model.safetensors | all 311 weight tensors, bf16, about 1.2 GB |
 | tokenizer.json | the full tokenizer: vocab and merge rules |
 | tokenizer_config.json | the chat template and special token names |
@@ -183,8 +183,10 @@ single border:
    engine;
 2. so the loader converts, once, at startup: the supported format in,
    the engine's own in-memory bundle out. That bundle is a struct
-   named `Yamf`, and inside the engine only Yamf exists — no module
-   past the border ever sees a format;
+   named `Yamf` — Yet Another Model Format, ironically, since it is
+   not a format at all; the next chapter owns the joke — and inside
+   the engine only Yamf exists: no module past the border ever sees
+   a format;
 3. a new format therefore costs one adapter at the border and zero
    engine changes. Today there is one adapter (GGUF); the
    architecture does not care how many there ever are.
