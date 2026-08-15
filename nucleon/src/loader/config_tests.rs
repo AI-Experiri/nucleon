@@ -11,6 +11,7 @@ fn qwen3_kvs() -> GgufBuilder {
         .kv_u32("qwen3.attention.head_count", 2)
         .kv_u32("qwen3.attention.head_count_kv", 1)
         .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
         .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
         .kv_f32("qwen3.rope.freq_base", 1e6)
         .kv_u32("qwen3.context_length", 512)
@@ -78,10 +79,7 @@ fn missing_key_is_named() {
 #[test]
 fn wrong_value_type_is_named_both_ways() {
     let b = qwen3_kvs()
-        .kv_str(
-            "qwen3.attention.value_length",
-            "irrelevant extra key is fine",
-        )
+        .kv_str("qwen3.some_future_key", "irrelevant extra key is fine")
         .build();
     // sanity: extra unknown keys do not bother the config reader
     let c = parse(&b).unwrap();

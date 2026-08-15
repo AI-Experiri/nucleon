@@ -129,27 +129,105 @@ fn expected_tensors(cfg: &Qwen3Config) -> HashMap<String, Vec<usize>> {
 
 /// Load a GGUF file through the gate. See the book's chapter 7 for
 /// the full contract this implements.
+///
+/// The file is read into memory (about 640 MB for Qwen3-0.6B, and
+/// every byte is converted during dequant anyway). mmap returns in
+/// Part III, when packed weights are computed from directly and its
+/// unsafe contract is worth confronting.
 pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
-    let file = std::fs::File::open(path)?;
-    // Safety: the map is read-only and the invariant is a local model
-    // file nobody rewrites while nucleon runs (book 7.2).
-    let map = unsafe { memmap2::Mmap::map(&file)? };
-    load_bytes(&map)
+    let bytes = std::fs::read(path)?;
+    load_bytes(&bytes)
 }
 
-/// The whole gate over in-memory bytes; `load` adds only the mmap.
-/// Tests feed synthetic files through this seam.
+/// The whole gate over in-memory bytes; `load` adds only the file
+/// read. Tests feed synthetic files through this seam.
+///
+/// Passes ordered cheap to expensive: metadata and template checks,
+/// then the tensor contract (shapes, ranges, overlap), then dequant.
+/// A refusal never costs a gigabyte of allocation first.
 pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     let container = parse(bytes)?;
     let family = family_config(&container)?;
     let FamilyConfig::Qwen3(cfg) = &family;
 
-    // ---- the tensor contract: exact set, exact shapes, sane bytes.
+    // ---- pass 1: cheapest checks first — tokenizer metadata and
+    // the template need no allocation worth naming.
+    // The gate refuses tokenizer kinds the tokenizer block cannot
+    // build: byte-level BPE ("gpt2") with the qwen2 pre-tokenizer.
+    let model = get_str(&container, "tokenizer.ggml.model")?;
+    if model != "gpt2" {
+        return Err(LoaderError::Structure {
+            reason: format!("tokenizer model \"{model}\"; nucleon supports: gpt2 (byte-level BPE)"),
+        });
+    }
+    let pre = get_str(&container, "tokenizer.ggml.pre")?.to_string();
+    if pre != "qwen2" {
+        return Err(LoaderError::Structure {
+            reason: format!("pre-tokenizer \"{pre}\"; nucleon supports: qwen2"),
+        });
+    }
+    let eos = get_u32(&container, "tokenizer.ggml.eos_token_id")?;
+    let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
+    let chat_template = ChatTemplate::new(template_src)?;
+
+    let mut container = container; // consume the arrays without cloning
+    let tokens = take_str_array(&mut container, "tokenizer.ggml.tokens")?;
+    if u64::from(eos) >= tokens.len() as u64 {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "eos_token_id {eos} is outside the vocab of {}",
+                tokens.len()
+            ),
+        });
+    }
+    let type_ints = take_i32_array(&mut container, "tokenizer.ggml.token_type")?;
+    if type_ints.len() != tokens.len() {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "token_type has {} entries, tokens has {}",
+                type_ints.len(),
+                tokens.len()
+            ),
+        });
+    }
+    let mut token_types = Vec::with_capacity(type_ints.len());
+    for v in type_ints {
+        token_types.push(TokenType::from_i32(v)?);
+    }
+
+    let merge_strs = take_str_array(&mut container, "tokenizer.ggml.merges")?;
+    let mut merges = Vec::with_capacity(merge_strs.len());
+    for m in merge_strs {
+        // byte-level tokens encode real spaces as G-with-breve, so a
+        // merge is exactly "left right": one space, both sides full.
+        match m.split_once(' ') {
+            Some((a, b)) if !a.is_empty() && !b.is_empty() && !b.contains(' ') => {
+                merges.push((a.to_string(), b.to_string()))
+            }
+            _ => {
+                return Err(LoaderError::Structure {
+                    reason: format!("malformed merge entry \"{m}\""),
+                })
+            }
+        }
+    }
+
+    // The metadata under-reports stopping (book 7.3, landmine 2):
+    // assemble eos plus <|endoftext|> looked up by string.
+    let mut stop_token_ids = vec![eos];
+    if let Some(pos) = tokens.iter().position(|t| t == "<|endoftext|>") {
+        let id = pos as u32;
+        if id != eos {
+            stop_token_ids.push(id);
+        }
+    }
+
+    // ---- pass 2: the tensor contract, still no weight allocation.
     let mut expected = expected_tensors(cfg);
     let optional_output = vec![cfg.vocab_size as usize, cfg.hidden_size as usize];
     let region_len = container.file_len - container.data_start;
-    let mut ranges: Vec<(u64, u64, String)> = Vec::new();
-    let mut tensors = HashMap::new();
+    let mut plan: Vec<(&crate::loader::container::TensorInfo, Vec<usize>, u64, u64)> = Vec::new();
+    let mut ranges: Vec<(u64, u64, &str)> = Vec::new();
 
     for info in &container.tensors {
         // dims arrive in ne order (dims[0] contiguous); ours reverse.
@@ -199,17 +277,8 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 ),
             });
         }
-        ranges.push((info.offset, end, info.name.clone()));
-
-        let start = container.data_start + info.offset as usize;
-        let data = dequantize(
-            info.type_id,
-            &bytes[start..start + byte_len as usize],
-            n_elems as usize,
-            info.dims[0],
-            &info.name,
-        )?;
-        tensors.insert(info.name.clone(), Tensor::new(shape, data));
+        ranges.push((info.offset, end, &info.name));
+        plan.push((info, shape, n_elems, byte_len));
     }
 
     if let Some(name) = expected.keys().next() {
@@ -228,52 +297,19 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         }
     }
 
-    // ---- the tokenizer data, as plain vectors (7.8).
-    let eos = get_u32(&container, "tokenizer.ggml.eos_token_id")?;
-    let pre = get_str(&container, "tokenizer.ggml.pre")?.to_string();
-    let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
-
-    let mut container = container; // consume the arrays without cloning
-    let tokens = take_str_array(&mut container, "tokenizer.ggml.tokens")?;
-    let type_ints = take_i32_array(&mut container, "tokenizer.ggml.token_type")?;
-    if type_ints.len() != tokens.len() {
-        return Err(LoaderError::Structure {
-            reason: format!(
-                "token_type has {} entries, tokens has {}",
-                type_ints.len(),
-                tokens.len()
-            ),
-        });
+    // ---- pass 3: everything validated; now materialize the weights.
+    let mut tensors = HashMap::new();
+    for (info, shape, n_elems, byte_len) in plan {
+        let start = container.data_start + info.offset as usize;
+        let data = dequantize(
+            info.type_id,
+            &bytes[start..start + byte_len as usize],
+            n_elems as usize,
+            info.dims[0],
+            &info.name,
+        )?;
+        tensors.insert(info.name.clone(), Tensor::new(shape, data));
     }
-    let mut token_types = Vec::with_capacity(type_ints.len());
-    for v in type_ints {
-        token_types.push(TokenType::from_i32(v)?);
-    }
-
-    let merge_strs = take_str_array(&mut container, "tokenizer.ggml.merges")?;
-    let mut merges = Vec::with_capacity(merge_strs.len());
-    for m in merge_strs {
-        match m.split_once(' ') {
-            Some((a, b)) => merges.push((a.to_string(), b.to_string())),
-            None => {
-                return Err(LoaderError::Structure {
-                    reason: format!("merge entry \"{m}\" has no space separator"),
-                })
-            }
-        }
-    }
-
-    // The metadata under-reports stopping (book 7.3, landmine 2):
-    // assemble eos plus <|endoftext|> looked up by string.
-    let mut stop_token_ids = vec![eos];
-    if let Some(pos) = tokens.iter().position(|t| t == "<|endoftext|>") {
-        let id = pos as u32;
-        if id != eos {
-            stop_token_ids.push(id);
-        }
-    }
-
-    let chat_template = ChatTemplate::new(template_src)?;
 
     Ok(Yamf {
         family,
@@ -292,7 +328,19 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
 fn take_str_array(c: &mut Container, key: &'static str) -> Result<Vec<String>, LoaderError> {
     match c.metadata.remove(key) {
         None => Err(LoaderError::MissingKey { key }),
-        Some(MetaValue::Array(items)) => {
+        Some(MetaValue::Array {
+            elem_type_id,
+            items,
+        }) => {
+            // the declared element type must be string (8) even when
+            // the array is empty
+            if elem_type_id != 8 {
+                return Err(LoaderError::WrongType {
+                    key: key.to_string(),
+                    want: "array of strings",
+                    found: "array of another type",
+                });
+            }
             let mut out = Vec::with_capacity(items.len());
             for item in items {
                 match item {
@@ -319,7 +367,17 @@ fn take_str_array(c: &mut Container, key: &'static str) -> Result<Vec<String>, L
 fn take_i32_array(c: &mut Container, key: &'static str) -> Result<Vec<i32>, LoaderError> {
     match c.metadata.remove(key) {
         None => Err(LoaderError::MissingKey { key }),
-        Some(MetaValue::Array(items)) => {
+        Some(MetaValue::Array {
+            elem_type_id,
+            items,
+        }) => {
+            if elem_type_id != 5 {
+                return Err(LoaderError::WrongType {
+                    key: key.to_string(),
+                    want: "array of i32",
+                    found: "array of another type",
+                });
+            }
             let mut out = Vec::with_capacity(items.len());
             for item in items {
                 match item {

@@ -80,7 +80,7 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
 
     // There is no vocab_size key; the tokens array's length is it.
     let vocab_size = match get(c, "tokenizer.ggml.tokens")? {
-        MetaValue::Array(items) => {
+        MetaValue::Array { items, .. } => {
             u32::try_from(items.len()).map_err(|_| LoaderError::Structure {
                 reason: format!("tokens array length {} exceeds u32", items.len()),
             })?
@@ -94,7 +94,7 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
         }
     };
 
-    Ok(FamilyConfig::Qwen3(Qwen3Config {
+    let cfg = Qwen3Config {
         num_hidden_layers: get_u32(c, "qwen3.block_count")?,
         hidden_size: get_u32(c, "qwen3.embedding_length")?,
         intermediate_size: get_u32(c, "qwen3.feed_forward_length")?,
@@ -105,7 +105,61 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
         rope_theta: get_f32(c, "qwen3.rope.freq_base")?,
         max_position_embeddings: get_u32(c, "qwen3.context_length")?,
         vocab_size,
-    }))
+    };
+
+    // The file also declares a value-head length. Our attention op
+    // computes k and v at one head_dim, so the two must agree; a
+    // family where they differ is refused, not misread.
+    let value_length = get_u32(c, "qwen3.attention.value_length")?;
+    if value_length != cfg.head_dim {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "value_length {value_length} != key_length {}; nucleon's attention needs them equal",
+                cfg.head_dim
+            ),
+        });
+    }
+
+    // File-driven numbers get sanity caps so later arithmetic
+    // (expected shapes, cache sizing) cannot overflow or explode.
+    if cfg.num_hidden_layers == 0 || cfg.num_hidden_layers > 10_000 {
+        return Err(LoaderError::Structure {
+            reason: format!("block_count {} is outside 1..=10000", cfg.num_hidden_layers),
+        });
+    }
+    for (name, v) in [
+        ("embedding_length", cfg.hidden_size),
+        ("feed_forward_length", cfg.intermediate_size),
+        ("head_count", cfg.num_attention_heads),
+        ("head_count_kv", cfg.num_key_value_heads),
+        ("key_length", cfg.head_dim),
+    ] {
+        if v == 0 || v > 1_000_000 {
+            return Err(LoaderError::Structure {
+                reason: format!("qwen3 {name} {v} is outside 1..=1000000"),
+            });
+        }
+    }
+    if cfg.num_attention_heads.checked_mul(cfg.head_dim).is_none()
+        || cfg.num_key_value_heads.checked_mul(cfg.head_dim).is_none()
+    {
+        return Err(LoaderError::Structure {
+            reason: "head_count x head_dim overflows u32".to_string(),
+        });
+    }
+    if !cfg
+        .num_attention_heads
+        .is_multiple_of(cfg.num_key_value_heads)
+    {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "head_count {} does not divide evenly over head_count_kv {} (GQA)",
+                cfg.num_attention_heads, cfg.num_key_value_heads
+            ),
+        });
+    }
+
+    Ok(FamilyConfig::Qwen3(cfg))
 }
 
 #[cfg(test)]

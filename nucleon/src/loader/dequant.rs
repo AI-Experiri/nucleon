@@ -26,6 +26,11 @@ pub fn tensor_byte_len(
     row_len: u64,
     name: &str,
 ) -> Result<u64, LoaderError> {
+    if row_len == 0 || !n_elems.is_multiple_of(row_len) {
+        return Err(LoaderError::Structure {
+            reason: format!("tensor \"{name}\": {n_elems} values cannot be rows of {row_len}"),
+        });
+    }
     match type_id {
         GGML_F32 => n_elems
             .checked_mul(4)

@@ -17,8 +17,9 @@ loader, tokenizer, families, cache, sampler, generate, CLI) and
 `nucleon-metal` (MetalBackend + MSL kernels). Every step is a lego block:
 built, tested, journaled before the next begins.
 
-**Tech stack:** memmap2 (the GGUF parser is nucleon's own code;
-candle-core 0.11 as dev-dep test oracle only), tokenizers 0.23
+**Tech stack:** the GGUF parser is nucleon's own code over
+std::fs::read (mmap returns with Part III packed weights; candle-core
+0.11 as dev-dep test oracle only), tokenizers 0.23
 (default-features=false, fancy-regex — onig is C; tokenizer rebuilt
 from GGUF metadata), half 2.7 (fp16 block scales), minijinja (chat template parsed and
 validated at the gate — user decision), objc2-metal 0.3.

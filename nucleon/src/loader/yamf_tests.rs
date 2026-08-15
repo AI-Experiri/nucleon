@@ -37,9 +37,11 @@ fn mini() -> GgufBuilder {
         .kv_u32("qwen3.attention.head_count", 2)
         .kv_u32("qwen3.attention.head_count_kv", 1)
         .kv_u32("qwen3.attention.key_length", 16)
+        .kv_u32("qwen3.attention.value_length", 16)
         .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
         .kv_f32("qwen3.rope.freq_base", 1e6)
         .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", "gpt2")
         .kv_str("tokenizer.ggml.pre", "qwen2")
         .kv_u32("tokenizer.ggml.eos_token_id", 9)
         .kv_arr_str("tokenizer.ggml.tokens", &token_refs)
@@ -194,9 +196,11 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
         .kv_u32("qwen3.attention.head_count", 2)
         .kv_u32("qwen3.attention.head_count_kv", 1)
         .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
         .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
         .kv_f32("qwen3.rope.freq_base", 1e6)
         .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", "gpt2")
         .kv_str("tokenizer.ggml.pre", "qwen2")
         .kv_u32("tokenizer.ggml.eos_token_id", 1)
         .kv_arr_str("tokenizer.ggml.tokens", &["a", "b"])
@@ -248,25 +252,7 @@ fn unsupported_quant_type_is_refused_by_name() {
 fn broken_chat_template_fails_at_the_gate() {
     // an unclosed block is a parse error
     let tokens: Vec<&str> = vec!["a"];
-    let b = GgufBuilder::new()
-        .kv_str("general.architecture", "qwen3")
-        .kv_u32("qwen3.block_count", 0)
-        .kv_u32("qwen3.embedding_length", 8)
-        .kv_u32("qwen3.feed_forward_length", 16)
-        .kv_u32("qwen3.attention.head_count", 2)
-        .kv_u32("qwen3.attention.head_count_kv", 1)
-        .kv_u32("qwen3.attention.key_length", 4)
-        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
-        .kv_f32("qwen3.rope.freq_base", 1e6)
-        .kv_u32("qwen3.context_length", 64)
-        .kv_str("tokenizer.ggml.pre", "qwen2")
-        .kv_u32("tokenizer.ggml.eos_token_id", 0)
-        .kv_arr_str("tokenizer.ggml.tokens", &tokens)
-        .kv_arr_i32("tokenizer.ggml.token_type", &[1])
-        .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "{% if x %}no end")
-        .tensor("token_embd.weight", &[8, 1], GGML_F32, f32_bytes(&[0.0; 8]))
-        .tensor("output_norm.weight", &[8], GGML_F32, f32_bytes(&[1.0; 8]));
+    let b = base_kvs("gpt2", "qwen2", 0, &tokens, &[], "{% if x %}no end");
     match load_bytes(&b.build()) {
         Err(LoaderError::Template { .. }) => {}
         other => panic!("{:?}", other.err()),
@@ -324,4 +310,158 @@ fn oracle_candle_agrees_on_metadata_infos_and_dequant() {
     let yamf = load_bytes(&bytes).unwrap();
     let ours = yamf.tensors["blk.0.ffn_gate.weight"].data();
     assert_eq!(ours, theirs.as_slice());
+}
+
+// Full valid metadata (no tensors) with the tokenizer-facing pieces
+// parameterized, for probing the gate's cheap first pass.
+fn base_kvs(
+    model: &str,
+    pre: &str,
+    eos: u32,
+    tokens: &[&str],
+    merges: &[&str],
+    template: &str,
+) -> GgufBuilder {
+    let types: Vec<i32> = tokens.iter().map(|_| 1).collect();
+    GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", model)
+        .kv_str("tokenizer.ggml.pre", pre)
+        .kv_u32("tokenizer.ggml.eos_token_id", eos)
+        .kv_arr_str("tokenizer.ggml.tokens", tokens)
+        .kv_arr_i32("tokenizer.ggml.token_type", &types)
+        .kv_arr_str("tokenizer.ggml.merges", merges)
+        .kv_str("tokenizer.chat_template", template)
+}
+
+#[test]
+fn foreign_tokenizer_model_and_pre_are_refused_by_name() {
+    let b = base_kvs("llama", "qwen2", 0, &["a"], &[], "x");
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(
+                reason.contains("llama") && reason.contains("gpt2"),
+                "{reason}"
+            )
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    let b = base_kvs("gpt2", "deepseek", 0, &["a"], &[], "x");
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(
+                reason.contains("deepseek") && reason.contains("qwen2"),
+                "{reason}"
+            )
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn eos_outside_the_vocab_is_refused() {
+    let b = base_kvs("gpt2", "qwen2", 5, &["a", "b"], &[], "x");
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains('5') && reason.contains('2'), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn malformed_merges_are_refused() {
+    for bad in ["a b c", " b", "a ", "ab"] {
+        let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[bad], "x");
+        match load_bytes(&b.build()) {
+            Err(LoaderError::Structure { reason }) => {
+                assert!(reason.contains("merge"), "{bad}: {reason}")
+            }
+            other => panic!("{bad}: {:?}", other.err()),
+        }
+    }
+}
+
+#[test]
+fn empty_arrays_keep_their_declared_element_type() {
+    // empty string-typed merges: fine
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x");
+    // fails later (missing tensors), but NOT on the merges
+    match load_bytes(&b.build()) {
+        Err(LoaderError::MissingTensor { .. }) => {}
+        other => panic!("{:?}", other.err()),
+    }
+
+    // an i32-typed empty array where strings are declared: refused
+    let mut c = crate::loader::container::parse(
+        &GgufBuilder::new()
+            .kv_arr_i32("tokenizer.ggml.merges", &[])
+            .build(),
+    )
+    .unwrap();
+    match take_str_array(&mut c, "tokenizer.ggml.merges") {
+        Err(LoaderError::WrongType { key, .. }) => assert_eq!(key, "tokenizer.ggml.merges"),
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn overflowing_config_arithmetic_is_refused_not_panicking() {
+    // head_count x key_length overflows u32
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 1_000_000)
+        .kv_u32("qwen3.attention.head_count_kv", 1_000_000)
+        .kv_u32("qwen3.attention.key_length", 1_000_000)
+        .kv_u32("qwen3.attention.value_length", 1_000_000)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_arr_str("tokenizer.ggml.tokens", &["a"]);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("overflow"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn value_length_must_equal_key_length() {
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 8)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_arr_str("tokenizer.ggml.tokens", &["a"]);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(
+                reason.contains("value_length 8") && reason.contains('4'),
+                "{reason}"
+            )
+        }
+        other => panic!("{:?}", other.err()),
+    }
 }

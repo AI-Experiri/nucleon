@@ -7,7 +7,6 @@ description = "Pure-Rust LLM inference engine: core (backend-agnostic)"
 
 [dependencies]
 half.workspace = true
-memmap2.workspace = true
 minijinja.workspace = true
 
 [[bin]]

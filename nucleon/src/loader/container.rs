@@ -30,7 +30,12 @@ pub enum MetaValue {
     F32(f32),
     Bool(bool),
     Str(String),
-    Array(Vec<MetaValue>),
+    /// The declared element type id survives even when the array is
+    /// empty, so typed consumers can validate it.
+    Array {
+        elem_type_id: u32,
+        items: Vec<MetaValue>,
+    },
     U64(u64),
     I64(i64),
     F64(f64),
@@ -49,7 +54,7 @@ impl MetaValue {
             MetaValue::F32(_) => "f32",
             MetaValue::Bool(_) => "bool",
             MetaValue::Str(_) => "string",
-            MetaValue::Array(_) => "array",
+            MetaValue::Array { .. } => "array",
             MetaValue::U64(_) => "u64",
             MetaValue::I64(_) => "i64",
             MetaValue::F64(_) => "f64",
@@ -166,13 +171,22 @@ fn read_value(
         },
         8 => MetaValue::Str(r.string("a string value")?),
         9 => {
-            let elem_type = r.u32("an array's element type")?;
+            let elem_type_id = r.u32("an array's element type")?;
+            if !(0..=12).contains(&elem_type_id) {
+                return Err(LoaderError::UnknownMetaType {
+                    key: key.to_string(),
+                    type_id: elem_type_id,
+                });
+            }
             let count = r.u64("an array's element count")?;
             let mut items = Vec::new();
             for _ in 0..count {
-                items.push(read_value(r, elem_type, key, depth + 1)?);
+                items.push(read_value(r, elem_type_id, key, depth + 1)?);
             }
-            MetaValue::Array(items)
+            MetaValue::Array {
+                elem_type_id,
+                items,
+            }
         }
         10 => MetaValue::U64(r.u64("a u64 value")?),
         11 => MetaValue::I64(r.u64("an i64 value")? as i64),
@@ -216,6 +230,20 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
     let mut metadata = HashMap::new();
     for _ in 0..kv_count {
         let key = r.string("a metadata key")?;
+        // spec: keys are ASCII, at most 65535 bytes
+        if key.len() > 65_535 {
+            return Err(LoaderError::Structure {
+                reason: format!(
+                    "metadata key of {} bytes exceeds the spec's 65535",
+                    key.len()
+                ),
+            });
+        }
+        if !key.is_ascii() {
+            return Err(LoaderError::Structure {
+                reason: format!("metadata key \"{key}\" is not ASCII (the spec requires it)"),
+            });
+        }
         let type_id = r.u32("a metadata value type")?;
         let value = read_value(&mut r, type_id, &key, 0)?;
         if metadata.insert(key.clone(), value).is_some() {
@@ -228,10 +256,10 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
     // The alignment can be declared anywhere in the metadata, so it
     // is resolved after all keys are read. Default 32; must be a
     // positive multiple of 8.
+    // spec: general.alignment is a u32; anything else is refused.
     let alignment = match metadata.get("general.alignment") {
         None => 32,
         Some(MetaValue::U32(a)) => u64::from(*a),
-        Some(MetaValue::U64(a)) => *a,
         Some(other) => {
             return Err(LoaderError::WrongType {
                 key: "general.alignment".to_string(),
@@ -295,16 +323,23 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
     }
 
     // Zero-pad to the alignment; the tensor data region starts there.
-    let rem = r.pos % (alignment as usize);
-    let data_start = if rem == 0 {
-        r.pos
-    } else {
-        r.pos + (alignment as usize - rem)
-    };
+    let align = usize::try_from(alignment).map_err(|_| LoaderError::Structure {
+        reason: format!("alignment {alignment} overflows usize"),
+    })?;
+    let rem = r.pos % align;
+    let pad = if rem == 0 { 0 } else { align - rem };
+    let data_start = r.pos.checked_add(pad).ok_or(LoaderError::Structure {
+        reason: "padding overflows the file position".to_string(),
+    })?;
     if data_start > bytes.len() {
         return Err(LoaderError::Truncated {
             reading: "the padding before tensor data",
             at: r.pos,
+        });
+    }
+    if bytes[r.pos..data_start].iter().any(|b| *b != 0) {
+        return Err(LoaderError::Structure {
+            reason: "padding before tensor data is not zeroed".to_string(),
         });
     }
 

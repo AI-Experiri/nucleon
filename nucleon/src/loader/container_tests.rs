@@ -34,7 +34,13 @@ fn parses_header_metadata_and_tensor_infos() {
         Some(&MetaValue::Bool(false))
     );
     match c.metadata.get("tokenizer.ggml.tokens") {
-        Some(MetaValue::Array(items)) => assert_eq!(items.len(), 2),
+        Some(MetaValue::Array {
+            elem_type_id,
+            items,
+        }) => {
+            assert_eq!(*elem_type_id, 8); // strings
+            assert_eq!(items.len(), 2);
+        }
         other => panic!("tokens: {other:?}"),
     }
     // data region starts aligned and inside the file
@@ -173,6 +179,74 @@ fn refuses_duplicate_metadata_keys() {
     let b = GgufBuilder::new().kv_u32("k", 1).kv_u32("k", 2).build();
     match parse(&b) {
         Err(LoaderError::Structure { reason }) => assert!(reason.contains("duplicate"), "{reason}"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn alignment_must_be_a_u32() {
+    // hand-build: general.alignment as u64
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    let key = b"general.alignment";
+    b.extend_from_slice(&(key.len() as u64).to_le_bytes());
+    b.extend_from_slice(key);
+    b.extend_from_slice(&10u32.to_le_bytes()); // type: u64
+    b.extend_from_slice(&64u64.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::WrongType { key, .. }) => assert_eq!(key, "general.alignment"),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn nonzero_padding_is_refused() {
+    let bytes = tiny();
+    let c = parse(&bytes).unwrap();
+    // tiny() has real padding before the data region; dirty one byte
+    let mut corrupt = bytes.clone();
+    assert!(c.data_start > 24, "fixture must have padding to corrupt");
+    corrupt[c.data_start - 1] = 1;
+    match parse(&corrupt) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("padding"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn non_ascii_and_oversized_metadata_keys_are_refused() {
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    let key = "ключ".as_bytes();
+    b.extend_from_slice(&(key.len() as u64).to_le_bytes());
+    b.extend_from_slice(key);
+    b.extend_from_slice(&4u32.to_le_bytes());
+    b.extend_from_slice(&1u32.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::Structure { reason }) => assert!(reason.contains("ASCII"), "{reason}"),
+        other => panic!("{other:?}"),
+    }
+
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    let key = vec![b'k'; 65_536];
+    b.extend_from_slice(&(key.len() as u64).to_le_bytes());
+    b.extend_from_slice(&key);
+    b.extend_from_slice(&4u32.to_le_bytes());
+    b.extend_from_slice(&1u32.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::Structure { reason }) => assert!(reason.contains("65535"), "{reason}"),
         other => panic!("{other:?}"),
     }
 }

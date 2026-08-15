@@ -702,7 +702,6 @@ version = "0.1.0"
 dependencies = [
  "candle-core",
  "half",
- "memmap2",
  "minijinja",
 ]
 

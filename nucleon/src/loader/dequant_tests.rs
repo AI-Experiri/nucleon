@@ -65,3 +65,13 @@ fn unsupported_type_names_itself_and_the_supported_list() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn inconsistent_elems_and_rows_are_refused() {
+    match tensor_byte_len(GGML_Q8_0, 33, 32, "t") {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("rows"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}

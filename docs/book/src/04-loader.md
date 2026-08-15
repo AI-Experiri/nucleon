@@ -72,11 +72,14 @@ identical structure. A big-endian file has no marker; it reveals
 itself by version reading as 50,331,648 instead of 3, and the parser
 refuses it by value.
 
-The file is read through mmap: the operating system maps it into our
-address space and pages it in as bytes are touched. The mapping is
-`unsafe` (the box is in [Metal 0](02-metal.md)) because Rust cannot
-prove the file stays unmodified while mapped; our stated invariant is
-a local file nobody rewrites mid-run. The memmap2 crate provides it.
+The file is read whole into memory with `std::fs::read`. The design
+first said mmap here; review round one overturned it: a memory-mapped
+file that another process modifies mid-run is undefined behavior, so
+a safe `load` function would be hiding an unsafety contract it cannot
+enforce — and at M1 the map buys nothing anyway, since dequantization
+touches every byte once. mmap returns in Part III, where packed
+weights are computed from directly and its `unsafe` contract (the box
+is in [Metal 0](02-metal.md)) gets confronted openly.
 
 ## 7.3 The metadata this file carries
 
@@ -98,6 +101,7 @@ config:
 | qwen3.attention.head_count | 16 | num_attention_heads |
 | qwen3.attention.head_count_kv | 8 | num_key_value_heads |
 | qwen3.attention.key_length | 128 | head_dim (no head_dim key exists; key_length carries it) |
+| qwen3.attention.value_length | 128 | checked equal to key_length: our attention op computes k and v at one head_dim; a family where they differ is refused, not misread |
 | qwen3.attention.layer_norm_rms_epsilon | 1e-6 (an f32; parse it as f32) | rms_norm_eps |
 | qwen3.rope.freq_base | 1000000.0 | rope_theta |
 | qwen3.context_length | 40960 | max_position_embeddings |
@@ -247,6 +251,7 @@ refusal message doubles as compatibility documentation:
 | general.architecture | "architecture {found}; nucleon supports: qwen3" |
 | tensor type | "{name} is {type}; supported: F32, Q8_0" |
 | metadata | "missing key {key}" / "key {key} has type {found}, expected {want}" |
+| tokenizer kind | "tokenizer model {found}; nucleon supports: gpt2 (byte-level BPE)" / "pre-tokenizer {found}; nucleon supports: qwen2" |
 | structure | out-of-bounds string length or tensor offset, misaligned offset, overlapping ranges, bool byte not 0/1 |
 
 The contract on what a loaded model must contain:
