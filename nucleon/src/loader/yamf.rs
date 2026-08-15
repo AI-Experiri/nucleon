@@ -136,14 +136,18 @@ fn expected_tensors(cfg: &Qwen3Config) -> HashMap<String, Vec<usize>> {
 /// unsafe contract is worth confronting.
 pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
     // refuse FIFOs, devices, and directories before reading: a pipe
-    // would block forever ahead of any GGUF check
-    let meta = std::fs::metadata(path)?;
-    if !meta.is_file() {
+    // would block forever ahead of any GGUF check. The check runs on
+    // the OPENED handle (fstat), so the path cannot be swapped
+    // between check and read.
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    if !file.metadata()?.is_file() {
         return Err(LoaderError::Structure {
             reason: format!("{} is not a regular file", path.display()),
         });
     }
-    let bytes = std::fs::read(path)?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
     load_bytes(&bytes)
 }
 
