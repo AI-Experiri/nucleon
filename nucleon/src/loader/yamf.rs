@@ -297,10 +297,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         plan.push((info, shape, n_elems, byte_len));
     }
 
-    if let Some(name) = expected.keys().next() {
-        return Err(LoaderError::MissingTensor { name: name.clone() });
-    }
-
+    // structural lies (overlap) refuse before completeness does
     ranges.sort();
     for pair in ranges.windows(2) {
         if pair[1].0 < pair[0].1 {
@@ -311,6 +308,10 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 ),
             });
         }
+    }
+
+    if let Some(name) = expected.keys().next() {
+        return Err(LoaderError::MissingTensor { name: name.clone() });
     }
 
     // ---- pass 3: everything validated; now materialize the weights.

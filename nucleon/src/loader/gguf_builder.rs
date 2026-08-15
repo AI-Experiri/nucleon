@@ -30,6 +30,7 @@ struct TensorSpec {
     ne_dims: Vec<u64>,
     type_id: u32,
     bytes: Vec<u8>,
+    forced_offset: Option<u64>,
 }
 
 /// Builds a spec-conforming GGUF v3 byte blob.
@@ -111,6 +112,27 @@ impl GgufBuilder {
             ne_dims: ne_dims.to_vec(),
             type_id,
             bytes,
+            forced_offset: None,
+        });
+        self
+    }
+
+    /// Add a tensor at an explicit data offset (for hostile-layout
+    /// fixtures: overlaps, misalignment).
+    pub(crate) fn tensor_at(
+        mut self,
+        name: &str,
+        ne_dims: &[u64],
+        type_id: u32,
+        bytes: Vec<u8>,
+        offset: u64,
+    ) -> Self {
+        self.tensors.push(TensorSpec {
+            name: name.into(),
+            ne_dims: ne_dims.to_vec(),
+            type_id,
+            bytes,
+            forced_offset: Some(offset),
         });
         self
     }
@@ -177,6 +199,9 @@ impl GgufBuilder {
             let rem = offset % self.alignment;
             if rem != 0 {
                 offset += self.alignment - rem;
+            }
+            if let Some(forced) = t.forced_offset {
+                offset = forced;
             }
             put_str(&mut out, &t.name);
             out.extend_from_slice(&(t.ne_dims.len() as u32).to_le_bytes());

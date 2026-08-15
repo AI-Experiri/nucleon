@@ -263,11 +263,33 @@ fn lying_array_counts_are_refused_before_allocation() {
     b.push(b'k');
     b.extend_from_slice(&9u32.to_le_bytes()); // array
     b.extend_from_slice(&0u32.to_le_bytes()); // of u8
-    b.extend_from_slice(&1_000_000_000_000u64.to_le_bytes());
+                                              // under the element cap, far over what the file holds
+    b.extend_from_slice(&1_000_000u64.to_le_bytes());
     match parse(&b) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("cannot hold"), "{reason}")
         }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn array_element_cap_refuses_honest_but_huge_arrays() {
+    // a file that really does contain 10M+1 u8 elements would pass
+    // the remaining-bytes check; the cap refuses it first (the test
+    // file only needs the count field to say so)
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    b.push(b'k');
+    b.extend_from_slice(&9u32.to_le_bytes()); // array
+    b.extend_from_slice(&0u32.to_le_bytes()); // of u8
+    b.extend_from_slice(&10_000_001u64.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::Structure { reason }) => assert!(reason.contains("cap"), "{reason}"),
         other => panic!("{other:?}"),
     }
 }

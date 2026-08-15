@@ -145,6 +145,18 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
             });
         }
     }
+    // the float knobs must be finite and positive, or every norm and
+    // every rope angle downstream is poisoned
+    for (name, v) in [
+        ("layer_norm_rms_epsilon", cfg.rms_norm_eps),
+        ("rope.freq_base", cfg.rope_theta),
+    ] {
+        if !v.is_finite() || v <= 0.0 {
+            return Err(LoaderError::Structure {
+                reason: format!("qwen3 {name} {v} must be finite and positive"),
+            });
+        }
+    }
     // context gets its own, wider range: 1M-token models are real
     if cfg.max_position_embeddings == 0 || cfg.max_position_embeddings > 100_000_000 {
         return Err(LoaderError::Structure {

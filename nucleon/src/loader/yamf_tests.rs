@@ -553,3 +553,87 @@ fn zero_context_length_is_refused() {
         other => panic!("{:?}", other.err()),
     }
 }
+
+#[test]
+fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
+    // out of bounds: truncate the built file so the last tensor's
+    // range sticks out past the data region
+    let full = mini().build();
+    let cut = &full[..full.len() - 8];
+    match load_bytes(cut) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("ends at data byte"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    // overlap: two tensors forced onto the same data offset
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x")
+        .kv_u32("qwen3.some", 1) // keep keys unique from base
+        .tensor_at(
+            "token_embd.weight",
+            &[8, 1],
+            GGML_F32,
+            f32_bytes(&[0.0; 8]),
+            0,
+        )
+        .tensor_at(
+            "output_norm.weight",
+            &[8],
+            GGML_F32,
+            f32_bytes(&[1.0; 8]),
+            0,
+        );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("overlap"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    // misalignment: an offset that is not a multiple of 32 refuses at
+    // the container layer, before any shape logic runs
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x").tensor_at(
+        "token_embd.weight",
+        &[8, 1],
+        GGML_F32,
+        f32_bytes(&[0.0; 8]),
+        3,
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("aligned"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn non_finite_or_non_positive_float_knobs_are_refused() {
+    for (eps, theta) in [
+        (f32::NAN, 1e6),
+        (1e-6, 0.0),
+        (-1e-6, 1e6),
+        (1e-6, f32::INFINITY),
+    ] {
+        let b = GgufBuilder::new()
+            .kv_str("general.architecture", "qwen3")
+            .kv_u32("qwen3.block_count", 1)
+            .kv_u32("qwen3.embedding_length", 8)
+            .kv_u32("qwen3.feed_forward_length", 16)
+            .kv_u32("qwen3.attention.head_count", 2)
+            .kv_u32("qwen3.attention.head_count_kv", 1)
+            .kv_u32("qwen3.attention.key_length", 4)
+            .kv_u32("qwen3.attention.value_length", 4)
+            .kv_f32("qwen3.attention.layer_norm_rms_epsilon", eps)
+            .kv_f32("qwen3.rope.freq_base", theta)
+            .kv_u32("qwen3.context_length", 64)
+            .kv_arr_str("tokenizer.ggml.tokens", &["a"]);
+        match load_bytes(&b.build()) {
+            Err(LoaderError::Structure { reason }) => {
+                assert!(reason.contains("finite"), "{reason}")
+            }
+            other => panic!("eps {eps} theta {theta}: {:?}", other.err()),
+        }
+    }
+}

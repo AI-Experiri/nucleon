@@ -17,6 +17,10 @@ const MAX_METADATA_KVS: u64 = 100_000;
 const MAX_TENSOR_NAME_BYTES: usize = 64;
 const MAX_TENSOR_DIMS: u32 = 4;
 const MAX_ARRAY_NESTING: u32 = 8;
+/// Largest legitimate arrays are the vocab (151,936) and merges; a
+/// hostile file could otherwise turn N honest bytes into ~32N bytes
+/// of MetaValue objects.
+const MAX_ARRAY_ELEMS: u64 = 10_000_000;
 
 /// One metadata value, spec type ids 0..=12.
 #[derive(Debug, Clone, PartialEq)]
@@ -199,6 +203,13 @@ fn read_value(
             // check runs BEFORE any allocation grows
             let min = min_encoded_size(elem_type_id);
             let remaining = (r.b.len() - r.pos) as u64;
+            if count > MAX_ARRAY_ELEMS {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                        "array under key \"{key}\" claims {count} elements, above the {MAX_ARRAY_ELEMS} cap"
+                    ),
+                });
+            }
             if count > remaining / min {
                 return Err(LoaderError::Structure {
                     reason: format!(
