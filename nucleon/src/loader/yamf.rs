@@ -60,9 +60,6 @@ pub struct TokenizerData {
 /// template fails at load, not at first chat. Wraps a minijinja
 /// environment owning the compiled template.
 pub struct ChatTemplate {
-    // consumed by the chat module's chapter (rendering); until then
-    // its only job is having parsed successfully at the gate
-    #[allow(dead_code)]
     env: minijinja::Environment<'static>,
     source: String,
 }
@@ -70,11 +67,23 @@ pub struct ChatTemplate {
 impl ChatTemplate {
     pub fn new(source: String) -> Result<Self, LoaderError> {
         let mut env = minijinja::Environment::new();
+        // the real Qwen3 template calls tojson (minijinja's "json"
+        // feature) and Python-style string methods like startswith
+        // and strip; pycompat supplies the latter. Without these the
+        // gate would bless a template that dies at first render.
+        env.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
         env.add_template_owned("chat".to_string(), source.clone())
             .map_err(|e| LoaderError::Template {
                 reason: e.to_string(),
             })?;
         Ok(Self { env, source })
+    }
+
+    /// The compiled environment, for the chat module's renderer.
+    /// Crate-internal: minijinja types never cross the crate API.
+    #[allow(dead_code)] // consumed when the chat chapter lands
+    pub(crate) fn environment(&self) -> &minijinja::Environment<'static> {
+        &self.env
     }
 
     /// The template's source text (rendering arrives with the chat
@@ -282,6 +291,16 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             reason: "vocab has no <|endoftext|> token; the stop set cannot be assembled"
                 .to_string(),
         })? as u32;
+    // the ChatML end marker is what the template actually emits; an
+    // eos id that names any other token would generate forever
+    if tokens[eos as usize] != "<|im_end|>" {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "eos_token_id {eos} names \"{}\", expected \"<|im_end|>\"",
+                tokens[eos as usize]
+            ),
+        });
+    }
     let mut stop_token_ids = vec![eos];
     if endoftext != eos {
         stop_token_ids.push(endoftext);

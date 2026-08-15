@@ -8,6 +8,7 @@ description = "Pure-Rust LLM inference engine: core (backend-agnostic)"
 [dependencies]
 half.workspace = true
 minijinja.workspace = true
+minijinja-contrib.workspace = true
 
 [[bin]]
 name = "nucleon"

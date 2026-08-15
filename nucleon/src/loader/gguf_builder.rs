@@ -61,6 +61,15 @@ impl GgufBuilder {
         self
     }
 
+    /// Declare a custom alignment: writes the metadata key AND lays
+    /// tensors out with it, so fixtures cannot drift.
+    #[allow(dead_code)]
+    pub(crate) fn alignment(mut self, a: u32) -> Self {
+        self.alignment = u64::from(a);
+        self.kvs.push(Kv::U32("general.alignment".into(), a));
+        self
+    }
+
     pub(crate) fn kv_u32(mut self, k: &str, v: u32) -> Self {
         self.kvs.push(Kv::U32(k.into(), v));
         self

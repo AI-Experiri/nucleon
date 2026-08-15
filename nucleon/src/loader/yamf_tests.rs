@@ -203,16 +203,19 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
         .kv_u32("qwen3.context_length", 64)
         .kv_str("tokenizer.ggml.model", "gpt2")
         .kv_str("tokenizer.ggml.pre", "qwen2")
-        .kv_u32("tokenizer.ggml.eos_token_id", 1)
-        .kv_arr_str("tokenizer.ggml.tokens", &["a", "<|endoftext|>"])
-        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1])
+        .kv_u32("tokenizer.ggml.eos_token_id", 2)
+        .kv_arr_str(
+            "tokenizer.ggml.tokens",
+            &["a", "<|endoftext|>", "<|im_end|>"],
+        )
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1, 1])
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     without = without.tensor(
         "token_embd.weight",
-        &[8, 2],
+        &[8, 3],
         GGML_F32,
-        f32_bytes(&[0.0; 16]),
+        f32_bytes(&[0.0; 24]),
     );
     match load_bytes(&without.build()) {
         Err(LoaderError::MissingTensor { .. }) => {}
@@ -347,7 +350,14 @@ fn base_kvs(
 
 #[test]
 fn foreign_tokenizer_model_and_pre_are_refused_by_name() {
-    let b = base_kvs("llama", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x");
+    let b = base_kvs(
+        "llama",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(
@@ -384,7 +394,14 @@ fn eos_outside_the_vocab_is_refused() {
 #[test]
 fn malformed_merges_are_refused() {
     for bad in ["a b c", " b", "a ", "ab"] {
-        let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[bad], "x");
+        let b = base_kvs(
+            "gpt2",
+            "qwen2",
+            2,
+            &["a", "<|endoftext|>", "<|im_end|>"],
+            &[bad],
+            "x",
+        );
         match load_bytes(&b.build()) {
             Err(LoaderError::Structure { reason }) => {
                 assert!(reason.contains("merge"), "{bad}: {reason}")
@@ -397,7 +414,14 @@ fn malformed_merges_are_refused() {
 #[test]
 fn empty_arrays_keep_their_declared_element_type() {
     // empty string-typed merges: fine
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x");
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    );
     // fails later (missing tensors), but NOT on the merges
     match load_bytes(&b.build()) {
         Err(LoaderError::MissingTensor { .. }) => {}
@@ -472,7 +496,15 @@ fn quantization_version_is_required_and_gated_when_quantized() {
     // the mini model carries a Q8_0 tensor; strip the version key by
     // rebuilding without it: reuse base_kvs (no tensors, so the key
     // is not required) plus one quantized tensor
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x").tensor(
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .tensor(
         "token_embd.weight",
         &[32, 1],
         GGML_Q8_0,
@@ -486,14 +518,21 @@ fn quantization_version_is_required_and_gated_when_quantized() {
     }
 
     // wrong version: refused by value
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x")
-        .kv_u32("general.quantization_version", 3)
-        .tensor(
-            "token_embd.weight",
-            &[32, 1],
-            GGML_Q8_0,
-            quantize_q8_0_ref(&[0.0; 32]),
-        );
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .kv_u32("general.quantization_version", 3)
+    .tensor(
+        "token_embd.weight",
+        &[32, 1],
+        GGML_Q8_0,
+        quantize_q8_0_ref(&[0.0; 32]),
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("quantization_version 3"), "{reason}")
@@ -519,9 +558,12 @@ fn u64_written_dimension_keys_are_accepted() {
         .kv_u32("qwen3.context_length", 64)
         .kv_str("tokenizer.ggml.model", "gpt2")
         .kv_str("tokenizer.ggml.pre", "qwen2")
-        .kv_u32("tokenizer.ggml.eos_token_id", 0)
-        .kv_arr_str("tokenizer.ggml.tokens", &["a", "<|endoftext|>"])
-        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1])
+        .kv_u32("tokenizer.ggml.eos_token_id", 2)
+        .kv_arr_str(
+            "tokenizer.ggml.tokens",
+            &["a", "<|endoftext|>", "<|im_end|>"],
+        )
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1, 1])
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     // fails on missing tensors, which means the u64 key was read fine
@@ -568,22 +610,29 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
     }
 
     // overlap: two tensors forced onto the same data offset
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x")
-        .kv_u32("qwen3.some", 1) // keep keys unique from base
-        .tensor_at(
-            "token_embd.weight",
-            &[8, 2],
-            GGML_F32,
-            f32_bytes(&[0.0; 16]),
-            0,
-        )
-        .tensor_at(
-            "output_norm.weight",
-            &[8],
-            GGML_F32,
-            f32_bytes(&[1.0; 8]),
-            0,
-        );
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .kv_u32("qwen3.some", 1) // keep keys unique from base
+    .tensor_at(
+        "token_embd.weight",
+        &[8, 3],
+        GGML_F32,
+        f32_bytes(&[0.0; 24]),
+        0,
+    )
+    .tensor_at(
+        "output_norm.weight",
+        &[8],
+        GGML_F32,
+        f32_bytes(&[1.0; 8]),
+        0,
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("overlap"), "{reason}")
@@ -593,11 +642,19 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
 
     // misalignment: an offset that is not a multiple of 32 refuses at
     // the container layer, before any shape logic runs
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x").tensor_at(
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .tensor_at(
         "token_embd.weight",
-        &[8, 2],
+        &[8, 3],
         GGML_F32,
-        f32_bytes(&[0.0; 16]),
+        f32_bytes(&[0.0; 24]),
         3,
     );
     match load_bytes(&b.build()) {
@@ -642,11 +699,19 @@ fn non_finite_or_non_positive_float_knobs_are_refused() {
 fn f16_tensor_refuses_as_unsupported_type_not_missing_quant_version() {
     // F16 (type id 1) is not quantized: no quantization_version is
     // demanded, and the refusal names the type
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x").tensor(
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .tensor(
         "token_embd.weight",
-        &[8, 2],
+        &[8, 3],
         1, // GGML F16
-        vec![0; 32],
+        vec![0; 48],
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::UnsupportedTensorType { type_id: 1, .. }) => {}
@@ -656,8 +721,15 @@ fn f16_tensor_refuses_as_unsupported_type_not_missing_quant_version() {
 
 #[test]
 fn add_bos_true_is_refused_for_qwen3() {
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x")
-        .kv_bool("tokenizer.ggml.add_bos_token", true);
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .kv_bool("tokenizer.ggml.add_bos_token", true);
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("add_bos"), "{reason}")
@@ -665,8 +737,15 @@ fn add_bos_true_is_refused_for_qwen3() {
         other => panic!("{:?}", other.err()),
     }
     // false is the documented reality and passes this gate
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x")
-        .kv_bool("tokenizer.ggml.add_bos_token", false);
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .kv_bool("tokenizer.ggml.add_bos_token", false);
     match load_bytes(&b.build()) {
         Err(LoaderError::MissingTensor { .. }) => {}
         other => panic!("{:?}", other.err()),
@@ -675,8 +754,15 @@ fn add_bos_true_is_refused_for_qwen3() {
 
 #[test]
 fn non_bool_add_bos_token_is_a_type_error() {
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "<|endoftext|>"], &[], "x")
-        .kv_u32("tokenizer.ggml.add_bos_token", 1);
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    )
+    .kv_u32("tokenizer.ggml.add_bos_token", 1);
     match load_bytes(&b.build()) {
         Err(LoaderError::WrongType { key, want, .. }) => {
             assert_eq!(key, "tokenizer.ggml.add_bos_token");
@@ -688,7 +774,7 @@ fn non_bool_add_bos_token_is_a_type_error() {
 
 #[test]
 fn vocab_without_endoftext_is_refused() {
-    let b = base_kvs("gpt2", "qwen2", 0, &["a", "b"], &[], "x");
+    let b = base_kvs("gpt2", "qwen2", 2, &["a", "b", "<|im_end|>"], &[], "x");
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("endoftext"), "{reason}")
@@ -745,4 +831,39 @@ fn load_refuses_non_regular_files() {
         }
         other => panic!("{:?}", other.err()),
     }
+}
+
+#[test]
+fn eos_naming_the_wrong_token_is_refused() {
+    // eos points at "a" instead of <|im_end|>
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        0,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("im_end"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn gate_accepts_tojson_and_pystring_methods_in_templates() {
+    // fragments of the real Qwen3 template that need the json
+    // feature and pycompat at render time; the gate must not bless
+    // less than the real template needs
+    let tpl = "{{ tools | tojson }}{% if content.startswith('x') %}y{% endif %}";
+    let t = ChatTemplate::new(tpl.to_string()).unwrap();
+    let rendered = t
+        .environment()
+        .get_template("chat")
+        .unwrap()
+        .render(minijinja::context! { tools => vec!["a"], content => "xz" })
+        .unwrap();
+    assert_eq!(rendered, "[\"a\"]y");
 }
