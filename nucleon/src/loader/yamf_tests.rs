@@ -637,3 +637,38 @@ fn non_finite_or_non_positive_float_knobs_are_refused() {
         }
     }
 }
+
+#[test]
+fn f16_tensor_refuses_as_unsupported_type_not_missing_quant_version() {
+    // F16 (type id 1) is not quantized: no quantization_version is
+    // demanded, and the refusal names the type
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x").tensor(
+        "token_embd.weight",
+        &[8, 1],
+        1, // GGML F16
+        vec![0; 16],
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::UnsupportedTensorType { type_id: 1, .. }) => {}
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn add_bos_true_is_refused_for_qwen3() {
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x")
+        .kv_bool("tokenizer.ggml.add_bos_token", true);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("add_bos"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+    // false is the documented reality and passes this gate
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x")
+        .kv_bool("tokenizer.ggml.add_bos_token", false);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::MissingTensor { .. }) => {}
+        other => panic!("{:?}", other.err()),
+    }
+}

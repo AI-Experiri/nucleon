@@ -151,12 +151,14 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     let FamilyConfig::Qwen3(cfg) = &family;
 
     // The spec requires general.quantization_version whenever any
-    // tensor is quantized; the block layouts it names are the ones
-    // dequant.rs implements (version 2 today).
+    // tensor is QUANTIZED (plain non-f32 floats like F16 are not);
+    // the block layouts it names are the ones dequant.rs implements
+    // (version 2 today). Unsupported types still refuse as
+    // UnsupportedTensorType, not as a missing version key.
     if container
         .tensors
         .iter()
-        .any(|t| t.type_id != crate::loader::dequant::GGML_F32)
+        .any(|t| t.type_id == crate::loader::dequant::GGML_Q8_0)
     {
         let qv = get_u32(&container, "general.quantization_version")?;
         if qv != 2 {
@@ -183,6 +185,14 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         });
     }
     let eos = get_u32(&container, "tokenizer.ggml.eos_token_id")?;
+    // the BOS landmine (book 7.3): qwen3 never prepends BOS. A file
+    // claiming add_bos_token = true is a broken conversion; honoring
+    // it silently is worse than refusing it loudly.
+    if let Some(MetaValue::Bool(true)) = container.metadata.get("tokenizer.ggml.add_bos_token") {
+        return Err(LoaderError::Structure {
+            reason: "add_bos_token is true; qwen3 never prepends BOS".to_string(),
+        });
+    }
     let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
     let chat_template = ChatTemplate::new(template_src)?;
 

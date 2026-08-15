@@ -282,13 +282,16 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
                 reason: format!("metadata key \"{key}\" is not ASCII (the spec requires it)"),
             });
         }
-        let type_id = r.u32("a metadata value type")?;
-        let value = read_value(&mut r, type_id, &key, 0)?;
-        if metadata.insert(key.clone(), value).is_some() {
+        // duplicate keys refuse BEFORE their value is parsed, so a
+        // hostile duplicate cannot attach an expensive payload
+        if metadata.contains_key(&key) {
             return Err(LoaderError::Structure {
                 reason: format!("duplicate metadata key \"{key}\""),
             });
         }
+        let type_id = r.u32("a metadata value type")?;
+        let value = read_value(&mut r, type_id, &key, 0)?;
+        metadata.insert(key, value);
     }
 
     // The alignment can be declared anywhere in the metadata, so it

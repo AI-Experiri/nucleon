@@ -293,3 +293,32 @@ fn array_element_cap_refuses_honest_but_huge_arrays() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn duplicate_key_refuses_before_its_value_is_parsed() {
+    // second "k" carries an array with a lying count; the duplicate
+    // refusal must fire first, proving no value work happened
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&2u64.to_le_bytes());
+    for _ in 0..2 {
+        b.extend_from_slice(&1u64.to_le_bytes());
+        b.push(b'k');
+        b.extend_from_slice(&4u32.to_le_bytes()); // u32
+        b.extend_from_slice(&1u32.to_le_bytes());
+    }
+    // make the second value an absurd array instead
+    let len = b.len();
+    b.truncate(len - 8); // drop the second u32 type+value
+    b.extend_from_slice(&9u32.to_le_bytes()); // array
+    b.extend_from_slice(&0u32.to_le_bytes()); // of u8
+    b.extend_from_slice(&1_000_000u64.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("duplicate"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}
