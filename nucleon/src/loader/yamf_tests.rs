@@ -672,3 +672,16 @@ fn add_bos_true_is_refused_for_qwen3() {
         other => panic!("{:?}", other.err()),
     }
 }
+
+#[test]
+fn non_bool_add_bos_token_is_a_type_error() {
+    let b =
+        base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x").kv_u32("tokenizer.ggml.add_bos_token", 1);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::WrongType { key, want, .. }) => {
+            assert_eq!(key, "tokenizer.ggml.add_bos_token");
+            assert_eq!(want, "bool");
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}

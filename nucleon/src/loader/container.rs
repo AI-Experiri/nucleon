@@ -135,10 +135,21 @@ impl<'a> Rd<'a> {
     }
 
     fn string(&mut self, what: &'static str) -> Result<String, LoaderError> {
+        self.string_capped(usize::MAX, what)
+    }
+
+    /// A string whose spec-bounded length is checked BEFORE any byte
+    /// is copied, so a hostile length cannot force the allocation.
+    fn string_capped(&mut self, max: usize, what: &'static str) -> Result<String, LoaderError> {
         let len = self.u64(what)?;
         let len = usize::try_from(len).map_err(|_| LoaderError::Structure {
             reason: format!("string length {len} overflows usize ({what})"),
         })?;
+        if len > max {
+            return Err(LoaderError::Structure {
+                reason: format!("{what} of {len} bytes exceeds the spec's {max}"),
+            });
+        }
         let bytes = self.take(len, what)?;
         String::from_utf8(bytes.to_vec()).map_err(|_| LoaderError::Structure {
             reason: format!("invalid UTF-8 in {what}"),
@@ -267,16 +278,9 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
 
     let mut metadata = HashMap::new();
     for _ in 0..kv_count {
-        let key = r.string("a metadata key")?;
-        // spec: keys are ASCII, at most 65535 bytes
-        if key.len() > 65_535 {
-            return Err(LoaderError::Structure {
-                reason: format!(
-                    "metadata key of {} bytes exceeds the spec's 65535",
-                    key.len()
-                ),
-            });
-        }
+        // spec: keys are ASCII, at most 65535 bytes; the cap applies
+        // before any byte is copied
+        let key = r.string_capped(65_535, "a metadata key")?;
         if !key.is_ascii() {
             return Err(LoaderError::Structure {
                 reason: format!("metadata key \"{key}\" is not ASCII (the spec requires it)"),
@@ -318,15 +322,7 @@ pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
     let mut tensors = Vec::new();
     let mut seen = std::collections::HashSet::new();
     for _ in 0..tensor_count {
-        let name = r.string("a tensor name")?;
-        if name.len() > MAX_TENSOR_NAME_BYTES {
-            return Err(LoaderError::Structure {
-                reason: format!(
-                    "tensor name of {} bytes exceeds the spec's {MAX_TENSOR_NAME_BYTES}",
-                    name.len()
-                ),
-            });
-        }
+        let name = r.string_capped(MAX_TENSOR_NAME_BYTES, "a tensor name")?;
         if !seen.insert(name.clone()) {
             return Err(LoaderError::Structure {
                 reason: format!("duplicate tensor \"{name}\""),

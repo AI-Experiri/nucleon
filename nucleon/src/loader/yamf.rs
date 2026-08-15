@@ -188,10 +188,20 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     // the BOS landmine (book 7.3): qwen3 never prepends BOS. A file
     // claiming add_bos_token = true is a broken conversion; honoring
     // it silently is worse than refusing it loudly.
-    if let Some(MetaValue::Bool(true)) = container.metadata.get("tokenizer.ggml.add_bos_token") {
-        return Err(LoaderError::Structure {
-            reason: "add_bos_token is true; qwen3 never prepends BOS".to_string(),
-        });
+    match container.metadata.get("tokenizer.ggml.add_bos_token") {
+        None | Some(MetaValue::Bool(false)) => {}
+        Some(MetaValue::Bool(true)) => {
+            return Err(LoaderError::Structure {
+                reason: "add_bos_token is true; qwen3 never prepends BOS".to_string(),
+            })
+        }
+        Some(other) => {
+            return Err(LoaderError::WrongType {
+                key: "tokenizer.ggml.add_bos_token".to_string(),
+                want: "bool",
+                found: other.kind(),
+            })
+        }
     }
     let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
     let chat_template = ChatTemplate::new(template_src)?;
