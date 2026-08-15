@@ -150,6 +150,22 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     let family = family_config(&container)?;
     let FamilyConfig::Qwen3(cfg) = &family;
 
+    // The spec requires general.quantization_version whenever any
+    // tensor is quantized; the block layouts it names are the ones
+    // dequant.rs implements (version 2 today).
+    if container
+        .tensors
+        .iter()
+        .any(|t| t.type_id != crate::loader::dequant::GGML_F32)
+    {
+        let qv = get_u32(&container, "general.quantization_version")?;
+        if qv != 2 {
+            return Err(LoaderError::Structure {
+                reason: format!("quantization_version {qv}; nucleon supports 2"),
+            });
+        }
+    }
+
     // ---- pass 1: cheapest checks first — tokenizer metadata and
     // the template need no allocation worth naming.
     // The gate refuses tokenizer kinds the tokenizer block cannot

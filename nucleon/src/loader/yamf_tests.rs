@@ -31,6 +31,7 @@ fn mini() -> GgufBuilder {
 
     GgufBuilder::new()
         .kv_str("general.architecture", "qwen3")
+        .kv_u32("general.quantization_version", 2)
         .kv_u32("qwen3.block_count", 1)
         .kv_u32("qwen3.embedding_length", hidden as u32)
         .kv_u32("qwen3.feed_forward_length", ffn as u32)
@@ -461,6 +462,93 @@ fn value_length_must_equal_key_length() {
                 reason.contains("value_length 8") && reason.contains('4'),
                 "{reason}"
             )
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn quantization_version_is_required_and_gated_when_quantized() {
+    // the mini model carries a Q8_0 tensor; strip the version key by
+    // rebuilding without it: reuse base_kvs (no tensors, so the key
+    // is not required) plus one quantized tensor
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x").tensor(
+        "token_embd.weight",
+        &[32, 1],
+        GGML_Q8_0,
+        quantize_q8_0_ref(&[0.0; 32]),
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::MissingKey { key }) => {
+            assert_eq!(key, "general.quantization_version")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    // wrong version: refused by value
+    let b = base_kvs("gpt2", "qwen2", 0, &["a"], &[], "x")
+        .kv_u32("general.quantization_version", 3)
+        .tensor(
+            "token_embd.weight",
+            &[32, 1],
+            GGML_Q8_0,
+            quantize_q8_0_ref(&[0.0; 32]),
+        );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("quantization_version 3"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn u64_written_dimension_keys_are_accepted() {
+    // same mini metadata but block_count as a u64 value
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u64("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", "gpt2")
+        .kv_str("tokenizer.ggml.pre", "qwen2")
+        .kv_u32("tokenizer.ggml.eos_token_id", 0)
+        .kv_arr_str("tokenizer.ggml.tokens", &["a"])
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1])
+        .kv_arr_str("tokenizer.ggml.merges", &[])
+        .kv_str("tokenizer.chat_template", "x");
+    // fails on missing tensors, which means the u64 key was read fine
+    match load_bytes(&b.build()) {
+        Err(LoaderError::MissingTensor { .. }) => {}
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn zero_context_length_is_refused() {
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 0)
+        .kv_arr_str("tokenizer.ggml.tokens", &["a"]);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("context_length"), "{reason}")
         }
         other => panic!("{:?}", other.err()),
     }

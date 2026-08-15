@@ -250,3 +250,24 @@ fn non_ascii_and_oversized_metadata_keys_are_refused() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn lying_array_counts_are_refused_before_allocation() {
+    // an array of u8 claiming a trillion elements in a tiny file
+    let mut b = Vec::new();
+    b.extend_from_slice(b"GGUF");
+    b.extend_from_slice(&3u32.to_le_bytes());
+    b.extend_from_slice(&0u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes());
+    b.extend_from_slice(&1u64.to_le_bytes()); // key length
+    b.push(b'k');
+    b.extend_from_slice(&9u32.to_le_bytes()); // array
+    b.extend_from_slice(&0u32.to_le_bytes()); // of u8
+    b.extend_from_slice(&1_000_000_000_000u64.to_le_bytes());
+    match parse(&b) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("cannot hold"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}

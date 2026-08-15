@@ -79,6 +79,8 @@ pub struct TensorInfo {
 pub struct Container {
     pub metadata: HashMap<String, MetaValue>,
     pub tensors: Vec<TensorInfo>,
+    // read by tests today; the inspect command will want it too
+    #[allow(dead_code)]
     pub alignment: u64,
     pub data_start: usize,
     pub file_len: usize,
@@ -140,6 +142,19 @@ impl<'a> Rd<'a> {
     }
 }
 
+/// The fewest bytes one encoded value of this type can occupy;
+/// used to bound array counts before allocating.
+fn min_encoded_size(type_id: u32) -> u64 {
+    match type_id {
+        0 | 1 | 7 => 1, // u8, i8, bool
+        2..=3 => 2,     // u16, i16
+        4..=6 => 4,     // u32, i32, f32
+        8 => 8,         // string: at least its u64 length
+        9 => 12,        // array: elem type + count
+        _ => 8,         // u64, i64, f64
+    }
+}
+
 /// Read one metadata value of the given type id.
 fn read_value(
     r: &mut Rd<'_>,
@@ -179,6 +194,18 @@ fn read_value(
                 });
             }
             let count = r.u64("an array's element count")?;
+            // every element consumes at least min_encoded_size bytes,
+            // so a count the remaining file cannot hold is a lie; the
+            // check runs BEFORE any allocation grows
+            let min = min_encoded_size(elem_type_id);
+            let remaining = (r.b.len() - r.pos) as u64;
+            if count > remaining / min {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                        "array under key \"{key}\" claims {count} elements, file cannot hold them"
+                    ),
+                });
+            }
             let mut items = Vec::new();
             for _ in 0..count {
                 items.push(read_value(r, elem_type_id, key, depth + 1)?);

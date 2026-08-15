@@ -38,6 +38,11 @@ pub(crate) fn get<'c>(c: &'c Container, key: &'static str) -> Result<&'c MetaVal
 pub(crate) fn get_u32(c: &Container, key: &'static str) -> Result<u32, LoaderError> {
     match get(c, key)? {
         MetaValue::U32(v) => Ok(*v),
+        // the spec's standardized count/length keys may be written as
+        // u64; accept them when the value fits
+        MetaValue::U64(v) => u32::try_from(*v).map_err(|_| LoaderError::Structure {
+            reason: format!("key \"{key}\" value {v} exceeds u32"),
+        }),
         other => Err(LoaderError::WrongType {
             key: key.to_string(),
             want: "u32",
@@ -139,6 +144,15 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
                 reason: format!("qwen3 {name} {v} is outside 1..=1000000"),
             });
         }
+    }
+    // context gets its own, wider range: 1M-token models are real
+    if cfg.max_position_embeddings == 0 || cfg.max_position_embeddings > 100_000_000 {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "context_length {} is outside 1..=100000000",
+                cfg.max_position_embeddings
+            ),
+        });
     }
     if cfg.num_attention_heads.checked_mul(cfg.head_dim).is_none()
         || cfg.num_key_value_heads.checked_mul(cfg.head_dim).is_none()

@@ -17,6 +17,7 @@ pub(crate) const GGML_Q8_0: u32 = 8;
 
 enum Kv {
     U32(String, u32),
+    U64(String, u64),
     F32(String, f32),
     Bool(String, bool),
     Str(String, String),
@@ -61,6 +62,11 @@ impl GgufBuilder {
 
     pub(crate) fn kv_u32(mut self, k: &str, v: u32) -> Self {
         self.kvs.push(Kv::U32(k.into(), v));
+        self
+    }
+
+    pub(crate) fn kv_u64(mut self, k: &str, v: u64) -> Self {
+        self.kvs.push(Kv::U64(k.into(), v));
         self
     }
 
@@ -121,6 +127,11 @@ impl GgufBuilder {
                 Kv::U32(k, v) => {
                     put_str(&mut out, k);
                     out.extend_from_slice(&T_U32.to_le_bytes());
+                    out.extend_from_slice(&v.to_le_bytes());
+                }
+                Kv::U64(k, v) => {
+                    put_str(&mut out, k);
+                    out.extend_from_slice(&10u32.to_le_bytes());
                     out.extend_from_slice(&v.to_le_bytes());
                 }
                 Kv::F32(k, v) => {
