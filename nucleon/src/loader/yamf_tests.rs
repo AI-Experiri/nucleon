@@ -13,8 +13,9 @@ fn mini() -> GgufBuilder {
     let kv_rows = 16u64; // 1 kv head x 16
     let vocab = 10u64;
 
-    let tokens: Vec<String> = (0..8)
-        .map(|i| format!("tok{i}"))
+    let tokens: Vec<String> = ["a", "b", "ab", "cc", "dd", "ccdd", "tok6", "tok7"]
+        .iter()
+        .map(|t| t.to_string())
         .chain(["<|endoftext|>".to_string(), "<|im_end|>".to_string()])
         .collect();
     let token_refs: Vec<&str> = tokens.iter().map(|s| s.as_str()).collect();
@@ -208,7 +209,7 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
             "tokenizer.ggml.tokens",
             &["a", "<|endoftext|>", "<|im_end|>"],
         )
-        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1, 1])
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     without = without.tensor(
@@ -326,7 +327,10 @@ fn base_kvs(
     merges: &[&str],
     template: &str,
 ) -> GgufBuilder {
-    let types: Vec<i32> = tokens.iter().map(|_| 1).collect();
+    let types: Vec<i32> = tokens
+        .iter()
+        .map(|t| if t.starts_with("<|") { 3 } else { 1 })
+        .collect();
     GgufBuilder::new()
         .kv_str("general.architecture", "qwen3")
         .kv_u32("qwen3.block_count", 1)
@@ -563,7 +567,7 @@ fn u64_written_dimension_keys_are_accepted() {
             "tokenizer.ggml.tokens",
             &["a", "<|endoftext|>", "<|im_end|>"],
         )
-        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1, 1])
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     // fails on missing tensors, which means the u64 key was read fine
@@ -866,4 +870,89 @@ fn gate_accepts_tojson_and_pystring_methods_in_templates() {
         .render(minijinja::context! { tools => vec!["a"], content => "xz" })
         .unwrap();
     assert_eq!(rendered, "[\"a\"]y");
+}
+
+#[test]
+fn merges_must_be_buildable_from_the_vocab() {
+    // right side missing from vocab
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        3,
+        &["x", "y", "<|endoftext|>", "<|im_end|>"],
+        &["x z"],
+        "t",
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("not in the vocab"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    // product missing from vocab
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        3,
+        &["x", "y", "<|endoftext|>", "<|im_end|>"],
+        &["x y"],
+        "t",
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("xy"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+
+    // duplicate merge
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        4,
+        &["x", "y", "xy", "<|endoftext|>", "<|im_end|>"],
+        &["x y", "x y"],
+        "t",
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("duplicate merge"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn stop_tokens_must_be_control_typed() {
+    // base_kvs types specials as Control; hand-build with im_end as
+    // Normal instead
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 4)
+        .kv_u32("qwen3.attention.value_length", 4)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", "gpt2")
+        .kv_str("tokenizer.ggml.pre", "qwen2")
+        .kv_u32("tokenizer.ggml.eos_token_id", 2)
+        .kv_arr_str(
+            "tokenizer.ggml.tokens",
+            &["a", "<|endoftext|>", "<|im_end|>"],
+        )
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 1])
+        .kv_arr_str("tokenizer.ggml.merges", &[])
+        .kv_str("tokenizer.chat_template", "x");
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("expected Control"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
 }

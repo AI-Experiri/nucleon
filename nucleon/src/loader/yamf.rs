@@ -264,20 +264,39 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     }
 
     let merge_strs = take_str_array(&mut container, "tokenizer.ggml.merges")?;
+    let vocab_set: std::collections::HashSet<&str> = tokens.iter().map(|t| t.as_str()).collect();
+    let mut merge_seen = std::collections::HashSet::new();
     let mut merges = Vec::with_capacity(merge_strs.len());
     for m in merge_strs {
         // byte-level tokens encode real spaces as G-with-breve, so a
         // merge is exactly "left right": one space, both sides full.
-        match m.split_once(' ') {
-            Some((a, b)) if !a.is_empty() && !b.is_empty() && !b.contains(' ') => {
-                merges.push((a.to_string(), b.to_string()))
-            }
+        let (a, b) = match m.split_once(' ') {
+            Some((a, b)) if !a.is_empty() && !b.is_empty() && !b.contains(' ') => (a, b),
             _ => {
                 return Err(LoaderError::Structure {
                     reason: format!("malformed merge entry \"{m}\""),
                 })
             }
+        };
+        // a merge only makes sense if both sides and their product
+        // are vocabulary entries; otherwise the BPE build fails later
+        // and the gate would have lied about validating the border
+        let product = format!("{a}{b}");
+        for piece in [a, b, product.as_str()] {
+            if !vocab_set.contains(piece) {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                        "merge \"{m}\" refers to \"{piece}\", which is not in the vocab"
+                    ),
+                });
+            }
         }
+        if !merge_seen.insert((a.to_string(), b.to_string())) {
+            return Err(LoaderError::Structure {
+                reason: format!("duplicate merge entry \"{m}\""),
+            });
+        }
+        merges.push((a.to_string(), b.to_string()));
     }
 
     // The metadata under-reports stopping (book 7.3, landmine 2):
@@ -300,6 +319,19 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 tokens[eos as usize]
             ),
         });
+    }
+    // both stop tokens must be typed Control: anything else means
+    // the tokenizer will not register them as special, and the
+    // template's markers would tokenize as plain text
+    for id in [eos, endoftext] {
+        if token_types[id as usize] != TokenType::Control {
+            return Err(LoaderError::Structure {
+                reason: format!(
+                    "stop token {id} (\"{}\") has token_type {:?}, expected Control",
+                    tokens[id as usize], token_types[id as usize]
+                ),
+            });
+        }
     }
     let mut stop_token_ids = vec![eos];
     if endoftext != eos {
