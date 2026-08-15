@@ -62,6 +62,19 @@ pub(crate) fn get_f32(c: &Container, key: &'static str) -> Result<f32, LoaderErr
     }
 }
 
+/// For keys the spec fixes at exactly u32 (quantization_version,
+/// eos_token_id): no u64 leniency.
+pub(crate) fn get_u32_exact(c: &Container, key: &'static str) -> Result<u32, LoaderError> {
+    match get(c, key)? {
+        MetaValue::U32(v) => Ok(*v),
+        other => Err(LoaderError::WrongType {
+            key: key.to_string(),
+            want: "u32",
+            found: other.kind(),
+        }),
+    }
+}
+
 pub(crate) fn get_str<'c>(c: &'c Container, key: &'static str) -> Result<&'c str, LoaderError> {
     match get(c, key)? {
         MetaValue::Str(v) => Ok(v),

@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::loader::config::{family_config, get_str, get_u32, FamilyConfig, Qwen3Config};
+use crate::loader::config::{family_config, get_str, get_u32_exact, FamilyConfig, Qwen3Config};
 use crate::loader::container::{parse, Container, MetaValue};
 use crate::loader::dequant::{dequantize, tensor_byte_len};
 use crate::loader::error::LoaderError;
@@ -135,6 +135,14 @@ fn expected_tensors(cfg: &Qwen3Config) -> HashMap<String, Vec<usize>> {
 /// Part III, when packed weights are computed from directly and its
 /// unsafe contract is worth confronting.
 pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
+    // refuse FIFOs, devices, and directories before reading: a pipe
+    // would block forever ahead of any GGUF check
+    let meta = std::fs::metadata(path)?;
+    if !meta.is_file() {
+        return Err(LoaderError::Structure {
+            reason: format!("{} is not a regular file", path.display()),
+        });
+    }
     let bytes = std::fs::read(path)?;
     load_bytes(&bytes)
 }
@@ -160,7 +168,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         .iter()
         .any(|t| t.type_id == crate::loader::dequant::GGML_Q8_0)
     {
-        let qv = get_u32(&container, "general.quantization_version")?;
+        let qv = get_u32_exact(&container, "general.quantization_version")?;
         if qv != 2 {
             return Err(LoaderError::Structure {
                 reason: format!("quantization_version {qv}; nucleon supports 2"),
@@ -184,7 +192,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             reason: format!("pre-tokenizer \"{pre}\"; nucleon supports: qwen2"),
         });
     }
-    let eos = get_u32(&container, "tokenizer.ggml.eos_token_id")?;
+    let eos = get_u32_exact(&container, "tokenizer.ggml.eos_token_id")?;
     // the BOS landmine (book 7.3): qwen3 never prepends BOS. A file
     // claiming add_bos_token = true is a broken conversion; honoring
     // it silently is worse than refusing it loudly.
@@ -215,6 +223,17 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 tokens.len()
             ),
         });
+    }
+    // BPE needs a bijective vocab: duplicates make ids ambiguous
+    {
+        let mut seen = std::collections::HashSet::new();
+        for (i, t) in tokens.iter().enumerate() {
+            if !seen.insert(t.as_str()) {
+                return Err(LoaderError::Structure {
+                    reason: format!("duplicate token at id {i}"),
+                });
+            }
+        }
     }
     let type_ints = take_i32_array(&mut container, "tokenizer.ggml.token_type")?;
     if type_ints.len() != tokens.len() {
@@ -249,13 +268,19 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     }
 
     // The metadata under-reports stopping (book 7.3, landmine 2):
-    // assemble eos plus <|endoftext|> looked up by string.
+    // assemble eos plus <|endoftext|>, looked up by string. A qwen3
+    // vocab without that token is a broken conversion; the promise
+    // that stop_token_ids is COMPLETE is worth refusing over.
+    let endoftext = tokens
+        .iter()
+        .position(|t| t == "<|endoftext|>")
+        .ok_or_else(|| LoaderError::Structure {
+            reason: "vocab has no <|endoftext|> token; the stop set cannot be assembled"
+                .to_string(),
+        })? as u32;
     let mut stop_token_ids = vec![eos];
-    if let Some(pos) = tokens.iter().position(|t| t == "<|endoftext|>") {
-        let id = pos as u32;
-        if id != eos {
-            stop_token_ids.push(id);
-        }
+    if endoftext != eos {
+        stop_token_ids.push(endoftext);
     }
 
     // ---- pass 2: the tensor contract, still no weight allocation.
