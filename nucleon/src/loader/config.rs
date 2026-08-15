@@ -1,0 +1,113 @@
+//! Metadata keys to `Qwen3Config` — book chapter 7.6.
+//!
+//! Typed values read by key name, no JSON anywhere. Missing key,
+//! wrong type, or a foreign `general.architecture` each refuse with
+//! a named error. The result reaches the engine wrapped in
+//! `FamilyConfig`, the one family-specific corner of the Yamf.
+
+use crate::loader::container::{Container, MetaValue};
+use crate::loader::error::LoaderError;
+
+/// The typed twin of the config keys the qwen3 family needs. One
+/// field per GGUF metadata key; values for Qwen3-0.6B in comments.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Qwen3Config {
+    pub num_hidden_layers: u32,       // qwen3.block_count           = 28
+    pub hidden_size: u32,             // qwen3.embedding_length      = 1024
+    pub intermediate_size: u32,       // qwen3.feed_forward_length   = 3072
+    pub num_attention_heads: u32,     // qwen3.attention.head_count  = 16
+    pub num_key_value_heads: u32,     // ...head_count_kv            = 8
+    pub head_dim: u32,                // ...key_length               = 128
+    pub rms_norm_eps: f32,            // ...layer_norm_rms_epsilon   = 1e-6
+    pub rope_theta: f32,              // qwen3.rope.freq_base        = 1e6
+    pub max_position_embeddings: u32, // qwen3.context_length        = 40960
+    pub vocab_size: u32,              // tokens array length         = 151936
+}
+
+/// The family tag: which family's numbers the Yamf carries. A second
+/// family is a second variant; nothing else in the Yamf moves.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FamilyConfig {
+    Qwen3(Qwen3Config),
+}
+
+pub(crate) fn get<'c>(c: &'c Container, key: &'static str) -> Result<&'c MetaValue, LoaderError> {
+    c.metadata.get(key).ok_or(LoaderError::MissingKey { key })
+}
+
+pub(crate) fn get_u32(c: &Container, key: &'static str) -> Result<u32, LoaderError> {
+    match get(c, key)? {
+        MetaValue::U32(v) => Ok(*v),
+        other => Err(LoaderError::WrongType {
+            key: key.to_string(),
+            want: "u32",
+            found: other.kind(),
+        }),
+    }
+}
+
+pub(crate) fn get_f32(c: &Container, key: &'static str) -> Result<f32, LoaderError> {
+    match get(c, key)? {
+        MetaValue::F32(v) => Ok(*v),
+        other => Err(LoaderError::WrongType {
+            key: key.to_string(),
+            want: "f32",
+            found: other.kind(),
+        }),
+    }
+}
+
+pub(crate) fn get_str<'c>(c: &'c Container, key: &'static str) -> Result<&'c str, LoaderError> {
+    match get(c, key)? {
+        MetaValue::Str(v) => Ok(v),
+        other => Err(LoaderError::WrongType {
+            key: key.to_string(),
+            want: "string",
+            found: other.kind(),
+        }),
+    }
+}
+
+/// Read the family config out of the metadata. The architecture is
+/// checked first: everything after assumes qwen3's key namespace.
+pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
+    let arch = get_str(c, "general.architecture")?;
+    if arch != "qwen3" {
+        return Err(LoaderError::UnsupportedArchitecture {
+            found: arch.to_string(),
+        });
+    }
+
+    // There is no vocab_size key; the tokens array's length is it.
+    let vocab_size = match get(c, "tokenizer.ggml.tokens")? {
+        MetaValue::Array(items) => {
+            u32::try_from(items.len()).map_err(|_| LoaderError::Structure {
+                reason: format!("tokens array length {} exceeds u32", items.len()),
+            })?
+        }
+        other => {
+            return Err(LoaderError::WrongType {
+                key: "tokenizer.ggml.tokens".to_string(),
+                want: "array",
+                found: other.kind(),
+            })
+        }
+    };
+
+    Ok(FamilyConfig::Qwen3(Qwen3Config {
+        num_hidden_layers: get_u32(c, "qwen3.block_count")?,
+        hidden_size: get_u32(c, "qwen3.embedding_length")?,
+        intermediate_size: get_u32(c, "qwen3.feed_forward_length")?,
+        num_attention_heads: get_u32(c, "qwen3.attention.head_count")?,
+        num_key_value_heads: get_u32(c, "qwen3.attention.head_count_kv")?,
+        head_dim: get_u32(c, "qwen3.attention.key_length")?,
+        rms_norm_eps: get_f32(c, "qwen3.attention.layer_norm_rms_epsilon")?,
+        rope_theta: get_f32(c, "qwen3.rope.freq_base")?,
+        max_position_embeddings: get_u32(c, "qwen3.context_length")?,
+        vocab_size,
+    }))
+}
+
+#[cfg(test)]
+#[path = "config_tests.rs"]
+mod tests;

@@ -1,0 +1,322 @@
+//! The GGUF container parser — book chapter 7.2, byte by byte.
+//!
+//! Everything little-endian. Layout: magic "GGUF", version (must be
+//! 3), tensor count, metadata count, the metadata key-values, the
+//! tensor infos, zero-padding to the alignment, then tensor data.
+//! This file knows bytes and structure only; what the values MEAN is
+//! config.rs and yamf.rs.
+
+use std::collections::HashMap;
+
+use crate::loader::error::LoaderError;
+
+/// Spec caps, used as sanity limits so a lying header cannot make us
+/// allocate absurdly before bounds checks catch it.
+const MAX_TENSORS: u64 = 1_000_000;
+const MAX_METADATA_KVS: u64 = 100_000;
+const MAX_TENSOR_NAME_BYTES: usize = 64;
+const MAX_TENSOR_DIMS: u32 = 4;
+const MAX_ARRAY_NESTING: u32 = 8;
+
+/// One metadata value, spec type ids 0..=12.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MetaValue {
+    U8(u8),
+    I8(i8),
+    U16(u16),
+    I16(i16),
+    U32(u32),
+    I32(i32),
+    F32(f32),
+    Bool(bool),
+    Str(String),
+    Array(Vec<MetaValue>),
+    U64(u64),
+    I64(i64),
+    F64(f64),
+}
+
+impl MetaValue {
+    /// The type's name for error messages.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            MetaValue::U8(_) => "u8",
+            MetaValue::I8(_) => "i8",
+            MetaValue::U16(_) => "u16",
+            MetaValue::I16(_) => "i16",
+            MetaValue::U32(_) => "u32",
+            MetaValue::I32(_) => "i32",
+            MetaValue::F32(_) => "f32",
+            MetaValue::Bool(_) => "bool",
+            MetaValue::Str(_) => "string",
+            MetaValue::Array(_) => "array",
+            MetaValue::U64(_) => "u64",
+            MetaValue::I64(_) => "i64",
+            MetaValue::F64(_) => "f64",
+        }
+    }
+}
+
+/// One tensor's directory entry. `dims` stays in the file's ne order
+/// (dims[0] = contiguous row length, REVERSED vs our row-major
+/// shapes); yamf.rs does the reversal, so the trap has one home.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TensorInfo {
+    pub name: String,
+    pub dims: Vec<u64>,
+    pub type_id: u32,
+    pub offset: u64,
+}
+
+/// The parsed container: everything before the tensor data, plus
+/// where that data starts.
+#[derive(Debug)]
+pub struct Container {
+    pub metadata: HashMap<String, MetaValue>,
+    pub tensors: Vec<TensorInfo>,
+    pub alignment: u64,
+    pub data_start: usize,
+    pub file_len: usize,
+}
+
+/// A cursor over the file bytes; every read is bounds-checked and a
+/// failure names what was being read and where.
+struct Rd<'a> {
+    b: &'a [u8],
+    pos: usize,
+}
+
+impl<'a> Rd<'a> {
+    fn take(&mut self, n: usize, what: &'static str) -> Result<&'a [u8], LoaderError> {
+        let end = self.pos.checked_add(n).ok_or(LoaderError::Structure {
+            reason: format!("length overflow reading {what}"),
+        })?;
+        if end > self.b.len() {
+            return Err(LoaderError::Truncated {
+                reading: what,
+                at: self.pos,
+            });
+        }
+        let s = &self.b[self.pos..end];
+        self.pos = end;
+        Ok(s)
+    }
+
+    fn u8(&mut self, what: &'static str) -> Result<u8, LoaderError> {
+        Ok(self.take(1, what)?[0])
+    }
+
+    fn u16(&mut self, what: &'static str) -> Result<u16, LoaderError> {
+        let s = self.take(2, what)?;
+        Ok(u16::from_le_bytes([s[0], s[1]]))
+    }
+
+    fn u32(&mut self, what: &'static str) -> Result<u32, LoaderError> {
+        let s = self.take(4, what)?;
+        Ok(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
+    }
+
+    fn u64(&mut self, what: &'static str) -> Result<u64, LoaderError> {
+        let s = self.take(8, what)?;
+        let mut a = [0u8; 8];
+        a.copy_from_slice(s);
+        Ok(u64::from_le_bytes(a))
+    }
+
+    fn string(&mut self, what: &'static str) -> Result<String, LoaderError> {
+        let len = self.u64(what)?;
+        let len = usize::try_from(len).map_err(|_| LoaderError::Structure {
+            reason: format!("string length {len} overflows usize ({what})"),
+        })?;
+        let bytes = self.take(len, what)?;
+        String::from_utf8(bytes.to_vec()).map_err(|_| LoaderError::Structure {
+            reason: format!("invalid UTF-8 in {what}"),
+        })
+    }
+}
+
+/// Read one metadata value of the given type id.
+fn read_value(
+    r: &mut Rd<'_>,
+    type_id: u32,
+    key: &str,
+    depth: u32,
+) -> Result<MetaValue, LoaderError> {
+    if depth > MAX_ARRAY_NESTING {
+        return Err(LoaderError::Structure {
+            reason: format!("metadata key \"{key}\" nests arrays deeper than {MAX_ARRAY_NESTING}"),
+        });
+    }
+    Ok(match type_id {
+        0 => MetaValue::U8(r.u8("a u8 value")?),
+        1 => MetaValue::I8(r.u8("an i8 value")? as i8),
+        2 => MetaValue::U16(r.u16("a u16 value")?),
+        3 => MetaValue::I16(r.u16("an i16 value")? as i16),
+        4 => MetaValue::U32(r.u32("a u32 value")?),
+        5 => MetaValue::I32(r.u32("an i32 value")? as i32),
+        6 => MetaValue::F32(f32::from_bits(r.u32("an f32 value")?)),
+        7 => match r.u8("a bool value")? {
+            0 => MetaValue::Bool(false),
+            1 => MetaValue::Bool(true),
+            other => {
+                return Err(LoaderError::Structure {
+                    reason: format!("bool byte for key \"{key}\" is {other}, must be 0 or 1"),
+                })
+            }
+        },
+        8 => MetaValue::Str(r.string("a string value")?),
+        9 => {
+            let elem_type = r.u32("an array's element type")?;
+            let count = r.u64("an array's element count")?;
+            let mut items = Vec::new();
+            for _ in 0..count {
+                items.push(read_value(r, elem_type, key, depth + 1)?);
+            }
+            MetaValue::Array(items)
+        }
+        10 => MetaValue::U64(r.u64("a u64 value")?),
+        11 => MetaValue::I64(r.u64("an i64 value")? as i64),
+        12 => MetaValue::F64(f64::from_bits(r.u64("an f64 value")?)),
+        other => {
+            return Err(LoaderError::UnknownMetaType {
+                key: key.to_string(),
+                type_id: other,
+            })
+        }
+    })
+}
+
+/// Parse the container out of the raw file bytes.
+pub fn parse(bytes: &[u8]) -> Result<Container, LoaderError> {
+    let mut r = Rd { b: bytes, pos: 0 };
+
+    let magic = r.take(4, "the magic bytes")?;
+    if magic != b"GGUF" {
+        return Err(LoaderError::NotGguf {
+            found: [magic[0], magic[1], magic[2], magic[3]],
+        });
+    }
+    let version = r.u32("the version field")?;
+    if version != 3 {
+        return Err(LoaderError::UnsupportedVersion { found: version });
+    }
+    let tensor_count = r.u64("the tensor count")?;
+    if tensor_count > MAX_TENSORS {
+        return Err(LoaderError::Structure {
+            reason: format!("tensor count {tensor_count} exceeds the sanity cap {MAX_TENSORS}"),
+        });
+    }
+    let kv_count = r.u64("the metadata count")?;
+    if kv_count > MAX_METADATA_KVS {
+        return Err(LoaderError::Structure {
+            reason: format!("metadata count {kv_count} exceeds the sanity cap {MAX_METADATA_KVS}"),
+        });
+    }
+
+    let mut metadata = HashMap::new();
+    for _ in 0..kv_count {
+        let key = r.string("a metadata key")?;
+        let type_id = r.u32("a metadata value type")?;
+        let value = read_value(&mut r, type_id, &key, 0)?;
+        if metadata.insert(key.clone(), value).is_some() {
+            return Err(LoaderError::Structure {
+                reason: format!("duplicate metadata key \"{key}\""),
+            });
+        }
+    }
+
+    // The alignment can be declared anywhere in the metadata, so it
+    // is resolved after all keys are read. Default 32; must be a
+    // positive multiple of 8.
+    let alignment = match metadata.get("general.alignment") {
+        None => 32,
+        Some(MetaValue::U32(a)) => u64::from(*a),
+        Some(MetaValue::U64(a)) => *a,
+        Some(other) => {
+            return Err(LoaderError::WrongType {
+                key: "general.alignment".to_string(),
+                want: "u32",
+                found: other.kind(),
+            })
+        }
+    };
+    if alignment == 0 || alignment % 8 != 0 {
+        return Err(LoaderError::Structure {
+            reason: format!("alignment {alignment} is not a positive multiple of 8"),
+        });
+    }
+
+    let mut tensors = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for _ in 0..tensor_count {
+        let name = r.string("a tensor name")?;
+        if name.len() > MAX_TENSOR_NAME_BYTES {
+            return Err(LoaderError::Structure {
+                reason: format!(
+                    "tensor name of {} bytes exceeds the spec's {MAX_TENSOR_NAME_BYTES}",
+                    name.len()
+                ),
+            });
+        }
+        if !seen.insert(name.clone()) {
+            return Err(LoaderError::Structure {
+                reason: format!("duplicate tensor \"{name}\""),
+            });
+        }
+        let n_dims = r.u32("a tensor's dimension count")?;
+        if n_dims == 0 || n_dims > MAX_TENSOR_DIMS {
+            return Err(LoaderError::Structure {
+                reason: format!("tensor \"{name}\" has {n_dims} dims; the spec allows 1 to 4"),
+            });
+        }
+        let mut dims = Vec::with_capacity(n_dims as usize);
+        for _ in 0..n_dims {
+            let d = r.u64("a tensor dimension")?;
+            if d == 0 {
+                return Err(LoaderError::Structure {
+                    reason: format!("tensor \"{name}\" has a zero dimension"),
+                });
+            }
+            dims.push(d);
+        }
+        let type_id = r.u32("a tensor's ggml type")?;
+        let offset = r.u64("a tensor's data offset")?;
+        if offset % alignment != 0 {
+            return Err(LoaderError::Structure {
+                reason: format!("tensor \"{name}\" offset {offset} is not aligned to {alignment}"),
+            });
+        }
+        tensors.push(TensorInfo {
+            name,
+            dims,
+            type_id,
+            offset,
+        });
+    }
+
+    // Zero-pad to the alignment; the tensor data region starts there.
+    let rem = r.pos % (alignment as usize);
+    let data_start = if rem == 0 {
+        r.pos
+    } else {
+        r.pos + (alignment as usize - rem)
+    };
+    if data_start > bytes.len() {
+        return Err(LoaderError::Truncated {
+            reading: "the padding before tensor data",
+            at: r.pos,
+        });
+    }
+
+    Ok(Container {
+        metadata,
+        tensors,
+        alignment,
+        data_start,
+        file_len: bytes.len(),
+    })
+}
+
+#[cfg(test)]
+#[path = "container_tests.rs"]
+mod tests;
