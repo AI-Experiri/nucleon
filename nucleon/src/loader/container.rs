@@ -135,7 +135,10 @@ impl<'a> Rd<'a> {
     }
 
     fn string(&mut self, what: &'static str) -> Result<String, LoaderError> {
-        self.string_capped(usize::MAX, what)
+        // no legitimate metadata string approaches this: the largest
+        // real one is the ~4 KB chat template
+        const MAX_STRING_VALUE_BYTES: usize = 10_000_000;
+        self.string_capped(MAX_STRING_VALUE_BYTES, what)
     }
 
     /// A string whose spec-bounded length is checked BEFORE any byte

@@ -144,11 +144,18 @@ fn expected_tensors(cfg: &Qwen3Config) -> HashMap<String, Vec<usize>> {
 /// Part III, when packed weights are computed from directly and its
 /// unsafe contract is worth confronting.
 pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
-    // refuse FIFOs, devices, and directories before reading: a pipe
-    // would block forever ahead of any GGUF check. The check runs on
-    // the OPENED handle (fstat), so the path cannot be swapped
-    // between check and read.
+    // refuse FIFOs, devices, and directories: opening a FIFO with no
+    // writer blocks forever, so the kind is checked BEFORE open; the
+    // post-open fstat re-check closes the swap race for everything a
+    // plain open survives (a FIFO swapped in between the two calls
+    // can still block the open; full immunity needs O_NONBLOCK,
+    // which std does not expose).
     use std::io::Read;
+    if !std::fs::metadata(path)?.is_file() {
+        return Err(LoaderError::Structure {
+            reason: format!("{} is not a regular file", path.display()),
+        });
+    }
     let mut file = std::fs::File::open(path)?;
     if !file.metadata()?.is_file() {
         return Err(LoaderError::Structure {
@@ -179,7 +186,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     if container
         .tensors
         .iter()
-        .any(|t| t.type_id == crate::loader::dequant::GGML_Q8_0)
+        .any(|t| crate::loader::dequant::is_quantized(t.type_id))
     {
         let qv = get_u32_exact(&container, "general.quantization_version")?;
         if qv != 2 {
@@ -397,7 +404,8 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         plan.push((info, shape, n_elems, byte_len));
     }
 
-    // structural lies (overlap) refuse before completeness does
+    // structural lies (overlap) refuse before completeness does;
+    // the spec's zero-padding rule applies between tensors too
     ranges.sort();
     for pair in ranges.windows(2) {
         if pair[1].0 < pair[0].1 {
@@ -408,10 +416,22 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 ),
             });
         }
+        let gap_start = container.data_start + pair[0].1 as usize;
+        let gap_end = container.data_start + pair[1].0 as usize;
+        if bytes[gap_start..gap_end].iter().any(|b| *b != 0) {
+            return Err(LoaderError::Structure {
+                reason: format!(
+                    "padding between tensors \"{}\" and \"{}\" is not zeroed",
+                    pair[0].2, pair[1].2
+                ),
+            });
+        }
     }
 
-    if let Some(name) = expected.keys().next() {
-        return Err(LoaderError::MissingTensor { name: name.clone() });
+    if !expected.is_empty() {
+        // deterministic diagnostics: name the alphabetically first
+        let name = expected.keys().min().expect("nonempty").clone();
+        return Err(LoaderError::MissingTensor { name });
     }
 
     // ---- pass 3: everything validated; now materialize the weights.

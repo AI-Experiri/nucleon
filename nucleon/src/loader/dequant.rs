@@ -12,6 +12,13 @@ use crate::loader::error::LoaderError;
 pub const GGML_F32: u32 = 0;
 pub const GGML_Q8_0: u32 = 8;
 
+/// Whether a ggml type id is a QUANTIZED encoding (block scales),
+/// as opposed to a plain float layout like F32/F16/BF16. Grows with
+/// each quant type dequant.rs learns.
+pub fn is_quantized(type_id: u32) -> bool {
+    type_id == GGML_Q8_0
+}
+
 const Q8_0_BLOCK_VALUES: u64 = 32;
 const Q8_0_BLOCK_BYTES: u64 = 34; // 2 (f16 scale) + 32 (i8 values)
 

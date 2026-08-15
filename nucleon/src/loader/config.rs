@@ -91,9 +91,13 @@ pub(crate) fn get_str<'c>(c: &'c Container, key: &'static str) -> Result<&'c str
 pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
     let arch = get_str(c, "general.architecture")?;
     if arch != "qwen3" {
-        return Err(LoaderError::UnsupportedArchitecture {
-            found: arch.to_string(),
-        });
+        // truncate the echo: a hostile value should not balloon the
+        // error message
+        let mut found: String = arch.chars().take(64).collect();
+        if arch.chars().count() > 64 {
+            found.push_str("...");
+        }
+        return Err(LoaderError::UnsupportedArchitecture { found });
     }
 
     // There is no vocab_size key; the tokens array's length is it.

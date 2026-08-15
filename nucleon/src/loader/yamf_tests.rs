@@ -956,3 +956,82 @@ fn stop_tokens_must_be_control_typed() {
         other => panic!("{:?}", other.err()),
     }
 }
+
+#[test]
+fn nonzero_padding_between_tensors_is_refused() {
+    // mini packs perfectly (every tensor byte length is a multiple of
+    // 32), so plant a gap deliberately: the optional output.weight is
+    // forced 32 bytes past the natural end of the data region
+    let packed = mini().build();
+    let c = crate::loader::container::parse(&packed).unwrap();
+    let natural_end = c
+        .tensors
+        .iter()
+        .map(|i| {
+            let n: u64 = i.dims.iter().product();
+            let len = if i.type_id == GGML_Q8_0 {
+                n / 32 * 34
+            } else {
+                n * 4
+            };
+            i.offset + len
+        })
+        .max()
+        .unwrap();
+    let forced = natural_end.next_multiple_of(32) + 32;
+
+    let with_gap = mini()
+        .tensor_at(
+            "output.weight",
+            &[32, 10],
+            GGML_F32,
+            f32_bytes(&[0.0; 320]),
+            forced,
+        )
+        .build();
+    // the gap the builder zero-filled loads fine
+    assert!(load_bytes(&with_gap).is_ok());
+
+    // dirty one byte inside the gap: refused
+    let c = crate::loader::container::parse(&with_gap).unwrap();
+    let mut corrupt = with_gap.clone();
+    corrupt[c.data_start + natural_end as usize] = 7;
+    match load_bytes(&corrupt) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("padding between tensors"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn missing_tensor_diagnostic_is_deterministic() {
+    // two runs of the same incomplete file name the same tensor
+    let build = || {
+        base_kvs(
+            "gpt2",
+            "qwen2",
+            2,
+            &["a", "<|endoftext|>", "<|im_end|>"],
+            &[],
+            "x",
+        )
+        .tensor(
+            "token_embd.weight",
+            &[8, 3],
+            GGML_F32,
+            f32_bytes(&[0.0; 24]),
+        )
+        .build()
+    };
+    let a = match load_bytes(&build()) {
+        Err(LoaderError::MissingTensor { name }) => name,
+        other => panic!("{:?}", other.err()),
+    };
+    let b = match load_bytes(&build()) {
+        Err(LoaderError::MissingTensor { name }) => name,
+        other => panic!("{:?}", other.err()),
+    };
+    assert_eq!(a, b);
+    assert_eq!(a, "blk.0.attn_k.weight"); // alphabetically first
+}
