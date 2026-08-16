@@ -1035,3 +1035,90 @@ fn missing_tensor_diagnostic_is_deterministic() {
     assert_eq!(a, b);
     assert_eq!(a, "blk.0.attn_k.weight"); // alphabetically first
 }
+
+#[test]
+fn odd_head_dim_is_refused_at_the_gate() {
+    // key_length 5 is odd; RoPE would panic later
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 8)
+        .kv_u32("qwen3.feed_forward_length", 16)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 5)
+        .kv_u32("qwen3.attention.value_length", 5)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_arr_str("tokenizer.ggml.tokens", &["a"]);
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("even"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn nonzero_leading_padding_is_refused() {
+    // token_embd forced 32 bytes past the region start creates a
+    // leading gap
+    let with_gap = mini()
+        .tensor_at(
+            "output.weight",
+            &[32, 10],
+            GGML_F32,
+            f32_bytes(&[0.0; 320]),
+            0,
+        )
+        .build();
+    // build via a fresh mini where the first tensor is forced past 0
+    let bytes = {
+        let mini_bytes = mini().build();
+        let mut b = GgufBuilder::new()
+            .kv_str("general.architecture", "qwen3")
+            .kv_u32("qwen3.block_count", 1)
+            .kv_u32("qwen3.embedding_length", 32)
+            .kv_u32("qwen3.feed_forward_length", 64)
+            .kv_u32("qwen3.attention.head_count", 2)
+            .kv_u32("qwen3.attention.head_count_kv", 1)
+            .kv_u32("qwen3.attention.key_length", 16)
+            .kv_u32("qwen3.attention.value_length", 16)
+            .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+            .kv_f32("qwen3.rope.freq_base", 1e6)
+            .kv_u32("qwen3.context_length", 64)
+            .kv_str("tokenizer.ggml.model", "gpt2")
+            .kv_str("tokenizer.ggml.pre", "qwen2")
+            .kv_u32("tokenizer.ggml.eos_token_id", 2)
+            .kv_arr_str(
+                "tokenizer.ggml.tokens",
+                &["a", "<|endoftext|>", "<|im_end|>"],
+            )
+            .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3])
+            .kv_arr_str("tokenizer.ggml.merges", &[])
+            .kv_str("tokenizer.chat_template", "x");
+        // one tensor, forced 32 bytes past the region start
+        b = b.tensor_at(
+            "token_embd.weight",
+            &[32, 3],
+            GGML_F32,
+            f32_bytes(&[0.0; 96]),
+            32,
+        );
+        let bytes = b.build();
+        let _ = mini_bytes; // silence unused
+        bytes
+    };
+    let _ = with_gap;
+    // dirty a byte inside the leading gap
+    let c = crate::loader::container::parse(&bytes).unwrap();
+    let mut corrupt = bytes.clone();
+    corrupt[c.data_start] = 9;
+    match load_bytes(&corrupt) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("padding before tensor"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}

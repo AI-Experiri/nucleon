@@ -190,6 +190,13 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
             reason: "head_count x head_dim overflows u32".to_string(),
         });
     }
+    // RoPE needs even head_dim so pairs form; refuse at the gate,
+    // not with a panic on first rope() call
+    if !cfg.head_dim.is_multiple_of(2) {
+        return Err(LoaderError::Structure {
+            reason: format!("key_length {} must be even (RoPE pairs)", cfg.head_dim),
+        });
+    }
     if !cfg
         .num_attention_heads
         .is_multiple_of(cfg.num_key_value_heads)

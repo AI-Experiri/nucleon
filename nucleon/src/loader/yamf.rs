@@ -157,12 +157,25 @@ pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
         });
     }
     let mut file = std::fs::File::open(path)?;
-    if !file.metadata()?.is_file() {
+    let meta = file.metadata()?;
+    if !meta.is_file() {
         return Err(LoaderError::Structure {
             reason: format!("{} is not a regular file", path.display()),
         });
     }
-    let mut bytes = Vec::new();
+    // 100 GB caps everything the plan targets (Qwen3.8-27B GGUF at
+    // f16 is 56 GB) and refuses hostile huge files before the read
+    const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024 * 1024;
+    if meta.len() > MAX_FILE_BYTES {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "{} is {} bytes; nucleon caps loads at {MAX_FILE_BYTES}",
+                path.display(),
+                meta.len()
+            ),
+        });
+    }
+    let mut bytes = Vec::with_capacity(meta.len() as usize);
     file.read_to_end(&mut bytes)?;
     load_bytes(&bytes)
 }
@@ -405,8 +418,17 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     }
 
     // structural lies (overlap) refuse before completeness does;
-    // the spec's zero-padding rule applies between tensors too
+    // the spec's zero-padding rule applies between tensors too, and
+    // to the leading gap before the first tensor
     ranges.sort();
+    if let Some(first) = ranges.first() {
+        let head = &bytes[container.data_start..container.data_start + first.0 as usize];
+        if head.iter().any(|b| *b != 0) {
+            return Err(LoaderError::Structure {
+                reason: format!("padding before tensor \"{}\" is not zeroed", first.2),
+            });
+        }
+    }
     for pair in ranges.windows(2) {
         if pair[1].0 < pair[0].1 {
             return Err(LoaderError::Structure {
