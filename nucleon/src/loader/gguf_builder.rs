@@ -110,16 +110,25 @@ impl GgufBuilder {
     /// (config sanity, missing im_start, etc.) call this so the
     /// alphabet check does not fire first.
     pub(crate) fn with_full_byte_alphabet(mut self) -> Self {
+        // GPT-2 bytes_to_unicode: printable bytes are identity;
+        // non-printable bytes get sequential 256+n in byte order.
         fn bl(b: u8) -> char {
-            let x = b as u32;
-            let printable = (0x21..=0x7E).contains(&x)
-                || (0xA1..=0xAC).contains(&x)
-                || (0xAE..=0xFF).contains(&x);
-            if printable {
-                char::from_u32(x).unwrap()
-            } else {
-                char::from_u32(x + 256).unwrap()
+            fn printable(b: u8) -> bool {
+                let x = b as u32;
+                (0x21..=0x7E).contains(&x)
+                    || (0xA1..=0xAC).contains(&x)
+                    || (0xAE..=0xFF).contains(&x)
             }
+            if printable(b) {
+                return char::from_u32(b as u32).unwrap();
+            }
+            let mut n: u32 = 0;
+            for cand in 0..b {
+                if !printable(cand) {
+                    n += 1;
+                }
+            }
+            char::from_u32(256 + n).unwrap()
         }
         let mut token_idx = None;
         let mut type_idx = None;

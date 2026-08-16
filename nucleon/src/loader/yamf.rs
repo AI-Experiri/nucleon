@@ -455,6 +455,10 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     // has passed structural checks; now prove the template really
     // emits ChatML with them, so a syntactically valid but non-
     // ChatML template does not load and later render broken prompts.
+    // canary strings that MUST appear in the rendered output IN ORDER:
+    // markers plus the sample role and content. A template that
+    // hardcodes the markers but ignores the message would still fail
+    // because "user" and the content string are checked in place.
     let smoke = chat_template
         .environment()
         .get_template("chat")
@@ -462,7 +466,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         .render(minijinja::context! {
             messages => vec![minijinja::context! {
                 role => "user",
-                content => "hello",
+                content => "nucleon_smoke_content",
             }],
             add_generation_prompt => true,
             enable_thinking => false,
@@ -470,13 +474,23 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         .map_err(|e| LoaderError::Template {
             reason: format!("render smoke test failed: {e}"),
         })?;
-    for marker in ["<|im_start|>", "<|im_end|>", "<|im_start|>assistant"] {
-        if !smoke.contains(marker) {
-            return Err(LoaderError::Template {
-                reason: format!(
-                    "chat template rendered without \"{marker}\"; not a valid ChatML template"
-                ),
-            });
+    let mut cursor = 0;
+    for marker in [
+        "<|im_start|>",
+        "user",
+        "nucleon_smoke_content",
+        "<|im_end|>",
+        "<|im_start|>assistant",
+    ] {
+        match smoke[cursor..].find(marker) {
+            Some(rel) => cursor += rel + marker.len(),
+            None => {
+                return Err(LoaderError::Template {
+                    reason: format!(
+                        "chat template rendered without \"{marker}\" in the expected order; not a valid ChatML template"
+                    ),
+                })
+            }
         }
     }
 
@@ -606,21 +620,27 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     })
 }
 
-/// The HF ByteLevel byte-to-character mapping. Every byte that is
-/// not a printable ASCII/latin-1 range gets shifted by +256 into the
-/// PUA block, producing 256 distinct characters. Verified against
-/// tokenizers 0.23's ByteLevel::alphabet at build time by the
-/// alphabet-vocab check in load_bytes.
+/// The HF ByteLevel byte-to-character mapping (GPT-2's
+/// bytes_to_unicode): printable bytes map to themselves, and the
+/// remaining ~68 bytes get sequential characters starting at 256.
+/// Ported from tokenizers' pre_tokenizers::byte_level::bytes_char.
 fn byte_level_char(b: u8) -> char {
-    // "printable" per HF: '!'..='~', '\u{00A1}'..='\u{00AC}', '\u{00AE}'..='\u{00FF}'
-    let x = b as u32;
-    let printable =
-        (0x21..=0x7E).contains(&x) || (0xA1..=0xAC).contains(&x) || (0xAE..=0xFF).contains(&x);
-    if printable {
-        char::from_u32(x).expect("printable range")
-    } else {
-        char::from_u32(x + 256).expect("PUA range")
+    fn printable(b: u8) -> bool {
+        let x = b as u32;
+        (0x21..=0x7E).contains(&x) || (0xA1..=0xAC).contains(&x) || (0xAE..=0xFF).contains(&x)
     }
+    if printable(b) {
+        return char::from_u32(b as u32).expect("printable range");
+    }
+    // non-printable bytes get 256 + n, where n counts how many
+    // earlier bytes were also non-printable, in byte order
+    let mut n: u32 = 0;
+    for cand in 0..b {
+        if !printable(cand) {
+            n += 1;
+        }
+    }
+    char::from_u32(256 + n).expect("PUA range")
 }
 
 fn take_str_array(c: &mut Container, key: &'static str) -> Result<Vec<String>, LoaderError> {
