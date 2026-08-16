@@ -1,11 +1,11 @@
-# GPU 0
+# GPU
 
-We have a Tensor that works on the CPU: the Backend trait from Tensor 0,
-with CpuBackend's plain loops attached. Making the same Tensor work on
-the GPU takes two chapters. This one is about the hardware itself: what
-an Apple Silicon GPU physically is, where its memory lives, and how it
-compares to NVIDIA and AMD. The next chapter, Metal 0, writes software
-for it.
+The engine runs on Apple Silicon's GPU, so the first thing to
+understand is the hardware itself: what a GPU physically is, where
+its memory lives, and how Apple's design differs from NVIDIA and
+AMD. The next chapter, [Metal](02-metal.md), writes software for it;
+the one after that, [MLX](03-mlx.md), is Apple's library on top of
+Metal that becomes nucleon's compute layer.
 
 ## 3.1 The hardware: what an Apple Silicon GPU is
 

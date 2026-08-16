@@ -8,8 +8,7 @@
 
 # Part I: Data and hardware
 
-- [Tensor 0](01-tensor.md)
-- [GPU 0](02-gpu.md)
+- [GPU](02-gpu.md)
 - [Metal](02-metal.md)
 - [MLX](03-mlx.md)
 

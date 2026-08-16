@@ -234,7 +234,7 @@ supported.
 
 The world can fail (files are the world), so loading returns
 `Result<_, LoaderError>`; panics stay reserved for caller bugs, the
-rule Tensor 0 set.
+rule the loader inherits: errors for the world, panics for caller bugs.
 
 > **Rust: `enum` and `match`.** An enum value is exactly one of its
 > listed variants, each optionally carrying data; `match` forces

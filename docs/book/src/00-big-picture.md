@@ -150,9 +150,9 @@ to hold in your head, connected by types too dumb to leak complexity.
 
 | Ch | Block | Covers |
 |----|-------|--------|
-| 2 | tensor | the data structure everything else uses, and first Rust |
-| 3 | gpu | the hardware: cores, memories, vendor comparison |
-| 4 | metal | writing GPU software: kernels, fusion, the Backend trait on GPU |
+| 2 | gpu | the hardware: cores, memories, vendor comparison |
+| 3 | metal | writing GPU software: kernels, composed vs fused |
+| 4 | mlx | Apple's array library over Metal; the compute layer we run on |
 | 5 | engine plan | what Part II builds, in which order, and why |
 | 6 | reading the model | families, packages, formats, and the one-conversion thesis |
 | 7 | loader | the gate: GGUF in, Yamf out |

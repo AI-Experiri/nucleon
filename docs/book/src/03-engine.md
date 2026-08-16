@@ -1,21 +1,26 @@
 # The Engine
 
-Part I built parts: a tensor, eleven operations, two executors that
-agree. Part II assembles them into an engine that loads Qwen3-0.6B
-and generates text. This chapter is only the plan: what gets built,
-in which order, under which rule. The world knowledge the plan rests
-on — how models ship, what is in their files, the format we chose —
-is the next chapter, [Reading the Model](03-reading-the-model.md).
+Part I set the ground: [GPU](02-gpu.md) taught the hardware,
+[Metal](02-metal.md) taught what a kernel is and what composed vs
+fused costs, [MLX](03-mlx.md) is the library we run on. Part II
+assembles an engine out of that: loads Qwen3-0.6B and generates
+text. This chapter is only the plan — what gets built, in which
+order, under which rule. The world knowledge the plan rests on (how
+models ship, what is in their files, the format we chose) is the
+next chapter, [Reading the Model](03-reading-the-model.md).
 
 ## 5.1 What Part I left us
 
-- `Tensor` ([Tensor 0](01-tensor.md)): shape plus flat f32 data.
-- `trait Backend` ([Tensor 0](01-tensor.md), [Metal 0](02-metal.md)):
-  add, mul, silu, embed, matvec, matmul, rmsnorm, softmax, rope,
-  attention, argmax.
-- `CpuBackend`: the naive loops that define correct.
-- `MetalBackend`: the same trait on the GPU, held to the CPU by parity
-  tests.
+- **Hardware**: Apple Silicon's unified-memory GPU, one command
+  buffer per submission, the launch cost of a chain of ops.
+- **Concepts**: kernel, composed vs fused, why lazy graphs beat
+  per-op dispatch.
+- **The type**: `Array` (from `nucleon_mlx`, re-exported from
+  `mlx-rs`) — every tensor value in the engine is one of these.
+- **Ops we can call**: matmul, rms_norm, rope, silu, softmax,
+  scaled_dot_product_attention, argmax, plus elementwise adds and
+  multiplies — all `nucleon_mlx::` wrappers over MLX's built-ins
+  (chapter 5.4 of MLX).
 
 ## 5.2 The thesis: families and the two gates
 
