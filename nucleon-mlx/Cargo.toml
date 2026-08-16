@@ -1,0 +1,19 @@
+[package]
+name = "nucleon-mlx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Thin nucleon wrapper over mlx-rs: compute layer, version-inspection API"
+
+[dependencies]
+# mlx-rs is optional so the workspace builds cleanly while the local
+# mlx-sys build environment is being sorted out (bindgen size
+# assertion on this host: ESP32 xtensa toolchain on PATH confuses
+# clang target detection during first build). Turn on with:
+#   cargo build --workspace --features nucleon-mlx/mlx
+# Journal 0009 records the follow-up.
+mlx-rs = { workspace = true, optional = true }
+
+[features]
+default = []
+mlx = ["dep:mlx-rs"]

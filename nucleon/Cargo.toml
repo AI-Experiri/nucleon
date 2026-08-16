@@ -3,7 +3,7 @@ name = "nucleon"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Pure-Rust LLM inference engine: core (backend-agnostic)"
+description = "LLM inference engine core (loader, tokenizer, families, cache, sampler)"
 
 [dependencies]
 half.workspace = true

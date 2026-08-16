@@ -1,9 +1,13 @@
-//! nucleon — a pure-Rust LLM inference engine.
+//! nucleon — an LLM inference engine.
 //!
 //! Modules exist only once their chapter is built. So far:
-//! [`tensor`] (data), [`backend`] (the op seam, CPU + GPU impls),
-//! and [`loader`] (the gate: GGUF in, Yamf out). Coming per
-//! docs/plan.md: tokenizer, cache, families, sampler, generate, chat.
+//! [`tensor`] (data, still nucleon-owned for the loader border) and
+//! [`loader`] (the gate: GGUF in, Yamf out). Coming per docs/plan.md:
+//! tokenizer, cache, families, sampler, generate, chat.
+//!
+//! Compute lives in the `nucleon-mlx` sibling crate (thin wrapper
+//! over `mlx-rs`); the `Backend` trait + CpuBackend + hand-written
+//! Metal kernels this crate used to carry were removed in ADR 005.
 //!
 //! Rule of the house: a module depends only on modules below it, and every
 //! block is testable in isolation. See `docs/book/00-big-picture.md`.
@@ -13,6 +17,5 @@
 // lint dislikes tensor/tensor.rs; the names are deliberate.
 #![allow(clippy::module_inception)]
 
-pub mod backend;
 pub mod loader;
 pub mod tensor;

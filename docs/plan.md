@@ -3,6 +3,15 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development
 > or superpowers:executing-plans, task-by-task. Steps use `- [ ]` for tracking.
 
+> **Post-pivot note (2026-08-15):** ADR 005 replaced ADR 004: compute
+> runs through Apple's MLX via the `mlx-rs` Rust wrapper
+> (`nucleon-mlx` sibling crate). `nucleon-metal/`, `nucleon/src/backend/`,
+> the hand-written Metal kernels and the `Backend` trait were
+> removed. The steps below that mention writing our own Metal
+> device layer or op-parity tests need to be re-read as "use MLX's
+> equivalent"; a full plan rewrite lands after the family forward
+> pass is wired up on MLX.
+
 **Goal:** a pure-Rust LLM inference engine that generates real tokens from
 Qwen3-0.6B (official Q8_0 GGUF — ADR 004: GGUF is the ONLY weights
 format, for the engine's whole life) on CPU (M1), reaches GPU speed via our own Metal kernels (M2),
