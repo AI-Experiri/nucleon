@@ -185,11 +185,14 @@ fn loads_a_complete_mini_model() {
 fn dims_reverse_into_row_major_and_data_stays_put() {
     let yamf = load_bytes(&mini().build()).unwrap();
     let embd = &yamf.tensors["token_embd.weight"];
-    // ne [32, 10] becomes ours [10, 32]: 10 vocab rows of 32 values
+    // ne [32, 10] becomes ours [10, 32]: 10 vocab rows of 32 values.
+    // MLX Array shapes are &[i32]; the literal here infers i32.
     assert_eq!(embd.shape(), &[265, 32]);
     // the bytes are NOT moved: row r, col c = r*100 + c
-    assert_eq!(embd.at(&[0, 0]), 0.0);
-    assert_eq!(embd.at(&[3, 5]), 305.0);
+    let embd_data = embd.as_slice::<f32>();
+    let s = embd.shape();
+    assert_eq!(embd_data[nucleon_mlx::row_major_offset(s, &[0, 0])], 0.0);
+    assert_eq!(embd_data[nucleon_mlx::row_major_offset(s, &[3, 5])], 305.0);
 }
 
 #[test]
@@ -198,8 +201,10 @@ fn q8_0_tensor_dequantizes_exactly() {
     let gate = &yamf.tensors["blk.0.ffn_gate.weight"];
     assert_eq!(gate.shape(), &[64, 32]);
     // every fixture block has amax 127 (d = 1.0): exact integers back
-    assert_eq!(gate.at(&[0, 0]), -127.0);
-    assert_eq!(gate.at(&[0, 1]), -123.0);
+    let gate_data = gate.as_slice::<f32>();
+    let s = gate.shape();
+    assert_eq!(gate_data[nucleon_mlx::row_major_offset(s, &[0, 0])], -127.0);
+    assert_eq!(gate_data[nucleon_mlx::row_major_offset(s, &[0, 1])], -123.0);
 }
 
 #[test]
@@ -359,7 +364,7 @@ fn oracle_candle_agrees_on_metadata_infos_and_dequant() {
         .to_vec1::<f32>()
         .unwrap();
     let yamf = load_bytes(&bytes).unwrap();
-    let ours = yamf.tensors["blk.0.ffn_gate.weight"].data();
+    let ours = yamf.tensors["blk.0.ffn_gate.weight"].as_slice::<f32>();
     assert_eq!(ours, theirs.as_slice());
 }
 

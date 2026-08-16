@@ -889,6 +889,7 @@ dependencies = [
  "half",
  "minijinja",
  "minijinja-contrib",
+ "nucleon-mlx",
 ]
 
 [[package]]

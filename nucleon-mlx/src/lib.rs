@@ -18,6 +18,37 @@
 // to update.
 pub use mlx_rs::{fast, ops, Array, Device, Dtype};
 
+/// Build an f32 Array from a Vec<f32> and a row-major shape given
+/// as usize (nucleon-natural). mlx-rs's `Array::from_slice` wants
+/// `&[i32]` for the shape; this helper does the conversion in one
+/// place so the rest of nucleon never sees the i32/usize seam.
+pub fn array_from_f32(data: Vec<f32>, shape: &[usize]) -> Array {
+    let shape_i32: Vec<i32> = shape.iter().map(|&d| d as i32).collect();
+    Array::from_slice(&data, &shape_i32)
+}
+
+/// Read an Array's shape back as `Vec<usize>` (nucleon-natural).
+/// The underlying `Array::shape()` returns `&[i32]`; this is a plain
+/// widening cast (dims are non-negative, always safe from i32 to
+/// usize on aarch64).
+pub fn shape_usize(a: &Array) -> Vec<usize> {
+    a.shape().iter().map(|&d| d as usize).collect()
+}
+
+/// Row-major offset for a flat index vector. Handy in tests when a
+/// fixture wants to spot-check `a[i][j]` on an Array; combine with
+/// `a.as_slice::<f32>()[offset]`.
+pub fn row_major_offset(shape: &[i32], idx: &[usize]) -> usize {
+    assert_eq!(shape.len(), idx.len(), "index rank must match shape");
+    let mut off = 0usize;
+    let mut stride = 1usize;
+    for (dim, i) in shape.iter().rev().zip(idx.iter().rev()) {
+        off += i * stride;
+        stride *= *dim as usize;
+    }
+    off
+}
+
 /// The three pinned versions this build links, all baked into the
 /// binary at build time (static link). If we bump `mlx-rs` in the
 /// workspace `Cargo.toml`, we update these three constants to match

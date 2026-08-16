@@ -27,7 +27,7 @@ fn echo(s: &str) -> String {
 use crate::loader::error::LoaderError;
 use crate::loader::formats::gguf::container::{parse, Container, MetaValue};
 use crate::loader::formats::gguf::dequant::{dequantize, tensor_byte_len};
-use crate::tensor::Tensor;
+use nucleon_mlx::{array_from_f32, Array};
 
 /// Token classes from the GGUF spec's token_type array.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -116,7 +116,7 @@ impl ChatTemplate {
 /// wanted to say beyond it.
 pub struct Yamf {
     pub family: FamilyConfig,
-    pub tensors: HashMap<String, Tensor>,
+    pub tensors: HashMap<String, Array>,
     pub tokenizer: TokenizerData,
     pub chat_template: ChatTemplate,
 }
@@ -771,7 +771,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             info.dims[0],
             &info.name,
         )?;
-        tensors.insert(info.name.clone(), Tensor::new(shape, data));
+        tensors.insert(info.name.clone(), array_from_f32(data, &shape));
     }
 
     Ok(Yamf {

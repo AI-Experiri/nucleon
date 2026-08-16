@@ -281,7 +281,7 @@ module ever receives raw metadata. This is how it looks:
 ```rust
 pub struct Yamf {
     pub family: FamilyConfig,
-    pub tensors: HashMap<String, Tensor>,
+    pub tensors: HashMap<String, Array>,   // nucleon_mlx::Array
     pub tokenizer: TokenizerData,
     pub chat_template: ChatTemplate,
 }

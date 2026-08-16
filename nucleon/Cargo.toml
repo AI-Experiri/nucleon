@@ -9,6 +9,7 @@ description = "LLM inference engine core (loader, tokenizer, families, cache, sa
 half.workspace = true
 minijinja.workspace = true
 minijinja-contrib.workspace = true
+nucleon-mlx = { path = "../nucleon-mlx" }
 
 [[bin]]
 name = "nucleon"
