@@ -84,6 +84,11 @@ impl ChatTemplate {
         // and strip; pycompat supplies the latter. Without these the
         // gate would bless a template that dies at first render.
         env.set_unknown_method_callback(minijinja_contrib::pycompat::unknown_method_callback);
+        // Fuel bounds template runtime: 1M instructions is ~1000x
+        // what the real Qwen3 template needs; enough for legitimate
+        // templates, small enough that a hostile one refuses cleanly
+        // at load time rather than burning CPU.
+        env.set_fuel(Some(1_000_000));
         env.add_template_owned("chat".to_string(), source.clone())
             .map_err(|e| LoaderError::Template {
                 reason: e.to_string(),
@@ -460,15 +465,15 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     //     the tokenizer registers it atomically.
     let template_src = chat_template.source();
     let user_nonce = "nucleon_smoke_user_9c31f2";
-    // Second smoke render with tools + thinking enabled, bounded the
-    // same way, so a template that emits markers by dynamic string
-    // concatenation cannot hide from a source-only check.
-    let mut tools_smoke = String::new();
-    let _ = chat_template
-        .environment()
-        .get_template("chat")
-        .expect("added at ChatTemplate::new")
-        .render_captured_to(
+    // Two smoke renders, tools+thinking on AND tools off + thinking
+    // off. Both bounded the same way, so a template that emits
+    // markers by dynamic string concatenation cannot hide from a
+    // source-only check — either branch surfaces them. Render
+    // failures propagate: silently swallowing them would let a
+    // hostile template pass by breaking the probe.
+    let render_tools_smoke = |on: bool| -> Result<String, LoaderError> {
+        let mut buf = String::new();
+        let ctx = if on {
             minijinja::context! {
                 messages => vec![
                     minijinja::context! { role => "user", content => user_nonce },
@@ -486,12 +491,37 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
                 }],
                 add_generation_prompt => true,
                 enable_thinking => true,
-            },
-            CappedWriter {
-                inner: &mut tools_smoke,
-                cap: 64 * 1024,
-            },
-        );
+            }
+        } else {
+            minijinja::context! {
+                messages => vec![
+                    minijinja::context! { role => "user", content => user_nonce },
+                ],
+                add_generation_prompt => true,
+                enable_thinking => false,
+            }
+        };
+        chat_template
+            .environment()
+            .get_template("chat")
+            .expect("added at ChatTemplate::new")
+            .render_captured_to(
+                ctx,
+                CappedWriter {
+                    inner: &mut buf,
+                    cap: 64 * 1024,
+                },
+            )
+            .map_err(|e| LoaderError::Template {
+                reason: format!(
+                    "tools/thinking={} smoke render failed: {e}",
+                    if on { "on" } else { "off" }
+                ),
+            })?;
+        Ok(buf)
+    };
+    let tools_smoke_on = render_tools_smoke(true)?;
+    let tools_smoke_off = render_tools_smoke(false)?;
     for marker in [
         "<tool_call>",
         "</tool_call>",
@@ -501,7 +531,9 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         "</think>",
     ] {
         let position = tokens.iter().position(|t| t == marker);
-        let referenced = template_src.contains(marker) || tools_smoke.contains(marker);
+        let referenced = template_src.contains(marker)
+            || tools_smoke_on.contains(marker)
+            || tools_smoke_off.contains(marker);
         if referenced && position.is_none() {
             return Err(LoaderError::Structure {
                 reason: format!("chat template references \"{marker}\" but the vocab does not"),
@@ -540,18 +572,25 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             reason: "chat template contains a smoke-test nonce literally; nonce clash".to_string(),
         });
     }
-    let smoke = chat_template
+    let mut smoke = String::new();
+    chat_template
         .environment()
         .get_template("chat")
         .expect("added at ChatTemplate::new")
-        .render(minijinja::context! {
-            messages => vec![
-                minijinja::context! { role => "user", content => user_nonce },
-                minijinja::context! { role => "assistant", content => asst_nonce },
-            ],
-            add_generation_prompt => true,
-            enable_thinking => false,
-        })
+        .render_captured_to(
+            minijinja::context! {
+                messages => vec![
+                    minijinja::context! { role => "user", content => user_nonce },
+                    minijinja::context! { role => "assistant", content => asst_nonce },
+                ],
+                add_generation_prompt => true,
+                enable_thinking => false,
+            },
+            CappedWriter {
+                inner: &mut smoke,
+                cap: 64 * 1024,
+            },
+        )
         .map_err(|e| LoaderError::Template {
             reason: format!("render smoke test failed: {e}"),
         })?;
