@@ -1,0 +1,12 @@
+# Pin every build tool to the Mac's system compiler, so nothing on
+# the ambient PATH (an ESP32/xtensa toolchain, another cross-compiler,
+# a homebrew clang mid-upgrade) can mislead mlx-sys / bindgen about
+# the target. Journal 0009 records why this file exists.
+
+[env]
+CC = "/usr/bin/cc"
+CXX = "/usr/bin/c++"
+BINDGEN_EXTRA_CLANG_ARGS = "--target=aarch64-apple-darwin"
+
+[target.aarch64-apple-darwin]
+linker = "/usr/bin/cc"

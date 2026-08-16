@@ -10,11 +10,13 @@
 //! and exposes the pinned-version-triple as runtime calls. As the
 //! Qwen3 family lands, the actual op wrappers move here too.
 
-// Re-exports of the mlx-rs surface the rest of nucleon uses. Gated
-// behind the `mlx` feature while the local mlx-sys build env is
-// being sorted out (see Cargo.toml comment and journal 0009).
-#[cfg(feature = "mlx")]
-pub use mlx_rs::{ops, Array, Device, Dtype};
+// Re-exports of the mlx-rs surface the rest of nucleon uses. Names
+// mirror mlx-rs / mlx-c directly (Array not Tensor, ops::* under
+// their mlx-rs names, fast::* untouched) — the wrapping principle
+// is: same names, same signatures. This crate exists so that if
+// mlx-rs breaks compat on a version bump we have exactly one file
+// to update.
+pub use mlx_rs::{fast, ops, Array, Device, Dtype};
 
 /// The three pinned versions this build links, all baked into the
 /// binary at build time (static link). If we bump `mlx-rs` in the
