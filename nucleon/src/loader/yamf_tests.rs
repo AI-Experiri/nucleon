@@ -1,4 +1,9 @@
 use super::*;
+
+/// Minimal valid ChatML template that satisfies the load-time render
+/// smoke test. Tests only care that ChatML shape emits; the real
+/// Qwen3 template is much richer and gets exercised separately.
+const CHATML_TPL: &str = "{%- for m in messages -%}<|im_start|>{{ m.role }}\n{{ m.content }}<|im_end|>\n{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant\n{%- endif -%}";
 use crate::loader::gguf_builder::{f32_bytes, quantize_q8_0_ref, GgufBuilder, GGML_F32, GGML_Q8_0};
 
 // A 1-layer qwen3 mini model: hidden 32, ffn 64, 2 heads / 1 kv
@@ -59,7 +64,13 @@ fn mini() -> GgufBuilder {
         .kv_arr_str("tokenizer.ggml.tokens", &token_refs)
         .kv_arr_i32("tokenizer.ggml.token_type", &types)
         .kv_arr_str("tokenizer.ggml.merges", &["a b", "cc dd"])
-        .kv_str("tokenizer.chat_template", "{{ messages }}")
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        )
         .with_full_byte_alphabet()
         // ne order: dims[0] = row length
         .tensor(
@@ -158,7 +169,13 @@ fn loads_a_complete_mini_model() {
     assert_eq!(yamf.tokenizer.token_types[5], TokenType::Unused);
     let _ = 0;
     assert_eq!(yamf.tokenizer.token_types[8], TokenType::Control);
-    assert_eq!(yamf.chat_template.source(), "{{ messages }}");
+    assert_eq!(
+        yamf.chat_template.source(),
+        "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}"
+    );
 }
 
 #[test]
@@ -225,7 +242,13 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x")
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        )
         .with_full_byte_alphabet();
     without = without.tensor(
         "token_embd.weight",
@@ -381,7 +404,7 @@ fn foreign_tokenizer_model_and_pre_are_refused_by_name() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
@@ -393,7 +416,14 @@ fn foreign_tokenizer_model_and_pre_are_refused_by_name() {
         other => panic!("{:?}", other.err()),
     }
 
-    let b = base_kvs("gpt2", "deepseek", 0, &["a", "<|endoftext|>"], &[], "x");
+    let b = base_kvs(
+        "gpt2",
+        "deepseek",
+        0,
+        &["a", "<|endoftext|>"],
+        &[],
+        CHATML_TPL,
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(
@@ -413,7 +443,7 @@ fn eos_outside_the_vocab_is_refused() {
         500,
         &["a", "b", "<|endoftext|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
@@ -432,7 +462,7 @@ fn malformed_merges_are_refused() {
             2,
             &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
             &[bad],
-            "x",
+            CHATML_TPL,
         );
         match load_bytes(&b.build()) {
             Err(LoaderError::Structure { reason }) => {
@@ -452,7 +482,7 @@ fn empty_arrays_keep_their_declared_element_type() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     // fails later (missing tensors), but NOT on the merges
     match load_bytes(&b.build()) {
@@ -534,7 +564,7 @@ fn quantization_version_is_required_and_gated_when_quantized() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .tensor(
         "token_embd.weight",
@@ -556,7 +586,7 @@ fn quantization_version_is_required_and_gated_when_quantized() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .kv_u32("general.quantization_version", 3)
     .tensor(
@@ -597,7 +627,13 @@ fn u64_written_dimension_keys_are_accepted() {
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x")
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        )
         .with_full_byte_alphabet();
     // fails on missing tensors, which means the u64 key was read fine
     match load_bytes(&b.build()) {
@@ -649,7 +685,7 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .kv_u32("qwen3.some", 1) // keep keys unique from base
     .tensor_at(
@@ -681,7 +717,7 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .tensor_at(
         "token_embd.weight",
@@ -738,7 +774,7 @@ fn f16_tensor_refuses_as_unsupported_type_not_missing_quant_version() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .tensor(
         "token_embd.weight",
@@ -760,7 +796,7 @@ fn add_bos_true_is_refused_for_qwen3() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .kv_bool("tokenizer.ggml.add_bos_token", true);
     match load_bytes(&b.build()) {
@@ -776,7 +812,7 @@ fn add_bos_true_is_refused_for_qwen3() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .kv_bool("tokenizer.ggml.add_bos_token", false);
     match load_bytes(&b.build()) {
@@ -793,7 +829,7 @@ fn non_bool_add_bos_token_is_a_type_error() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     )
     .kv_u32("tokenizer.ggml.add_bos_token", 1);
     match load_bytes(&b.build()) {
@@ -807,7 +843,14 @@ fn non_bool_add_bos_token_is_a_type_error() {
 
 #[test]
 fn vocab_without_endoftext_is_refused() {
-    let b = base_kvs("gpt2", "qwen2", 2, &["a", "b", "<|im_end|>"], &[], "x");
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "b", "<|im_end|>"],
+        &[],
+        CHATML_TPL,
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("endoftext"), "{reason}")
@@ -824,7 +867,7 @@ fn duplicate_tokens_are_refused() {
         0,
         &["a", "a", "<|endoftext|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
@@ -855,7 +898,13 @@ fn spec_exact_u32_keys_reject_u64_values() {
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1])
         .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x");
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        );
     match load_bytes(&b.build()) {
         Err(LoaderError::WrongType { key, .. }) => {
             assert_eq!(key, "tokenizer.ggml.eos_token_id")
@@ -883,7 +932,7 @@ fn eos_naming_the_wrong_token_is_refused() {
         0,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
@@ -949,7 +998,7 @@ fn merges_must_be_buildable_from_the_vocab() {
         "qwen2",
         4,
         &[
-            "x",
+            CHATML_TPL,
             "y",
             "xy",
             "<|endoftext|>",
@@ -993,7 +1042,13 @@ fn stop_tokens_must_be_control_typed() {
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 1, 3])
         .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x");
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("expected Control"), "{reason}")
@@ -1059,7 +1114,7 @@ fn missing_tensor_diagnostic_is_deterministic() {
             2,
             &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
             &[],
-            "x",
+            CHATML_TPL,
         )
         .tensor(
             "token_embd.weight",
@@ -1142,7 +1197,13 @@ fn nonzero_leading_padding_is_refused() {
             )
             .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
             .kv_arr_str("tokenizer.ggml.merges", &[])
-            .kv_str("tokenizer.chat_template", "x")
+            .kv_str(
+                "tokenizer.chat_template",
+                "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+            )
             .with_full_byte_alphabet();
         // one tensor, forced 32 bytes past the region start
         b = b.tensor_at(
@@ -1179,7 +1240,7 @@ fn hostile_echoes_are_truncated_in_errors() {
         0,
         &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     let err = load_bytes(&b.build()).err().unwrap().to_string();
     assert!(err.contains("..."), "{err}");
@@ -1194,7 +1255,7 @@ fn missing_im_start_is_refused_at_the_gate() {
         2,
         &["a", "<|endoftext|>", "<|im_end|>"],
         &[],
-        "x",
+        CHATML_TPL,
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
@@ -1247,10 +1308,39 @@ fn optional_tool_marker_with_wrong_token_type_is_refused() {
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3, 1])
         .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x");
+        .kv_str(
+            "tokenizer.chat_template",
+            "{%- for m in messages -%}<|im_start|>{{ m.role }}
+{{ m.content }}<|im_end|>
+{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
+{%- endif -%}",
+        );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
             assert!(reason.contains("tool_call"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}
+
+#[test]
+fn template_without_chatml_markers_is_refused() {
+    // syntactically valid, but renders no <|im_start|>/<|im_end|>;
+    // the smoke test lives in load_bytes now, not ChatTemplate::new
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        2,
+        &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
+        &[],
+        "plain text with no template markers",
+    );
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Template { reason }) => {
+            assert!(
+                reason.contains("im_start") || reason.contains("ChatML"),
+                "{reason}"
+            )
         }
         other => panic!("{:?}", other.err()),
     }

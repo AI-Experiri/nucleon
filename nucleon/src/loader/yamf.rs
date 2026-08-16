@@ -451,6 +451,35 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         stop_token_ids.push(endoftext);
     }
 
+    // Last step of pass 1: render smoke test. Every tokenizer piece
+    // has passed structural checks; now prove the template really
+    // emits ChatML with them, so a syntactically valid but non-
+    // ChatML template does not load and later render broken prompts.
+    let smoke = chat_template
+        .environment()
+        .get_template("chat")
+        .expect("added at ChatTemplate::new")
+        .render(minijinja::context! {
+            messages => vec![minijinja::context! {
+                role => "user",
+                content => "hello",
+            }],
+            add_generation_prompt => true,
+            enable_thinking => false,
+        })
+        .map_err(|e| LoaderError::Template {
+            reason: format!("render smoke test failed: {e}"),
+        })?;
+    for marker in ["<|im_start|>", "<|im_end|>", "<|im_start|>assistant"] {
+        if !smoke.contains(marker) {
+            return Err(LoaderError::Template {
+                reason: format!(
+                    "chat template rendered without \"{marker}\"; not a valid ChatML template"
+                ),
+            });
+        }
+    }
+
     // ---- pass 2: the tensor contract, still no weight allocation.
     let mut expected = expected_tensors(cfg);
     let optional_output = vec![cfg.vocab_size as usize, cfg.hidden_size as usize];
