@@ -1186,3 +1186,43 @@ fn unimplemented_rope_scaling_key_is_refused() {
         other => panic!("{:?}", other.err()),
     }
 }
+
+#[test]
+fn optional_tool_marker_with_wrong_token_type_is_refused() {
+    // <tool_call> as Normal (1) instead of UserDefined (4) is a
+    // broken conversion; absence would be fine
+    let b = GgufBuilder::new()
+        .kv_str("general.architecture", "qwen3")
+        .kv_u32("qwen3.block_count", 1)
+        .kv_u32("qwen3.embedding_length", 32)
+        .kv_u32("qwen3.feed_forward_length", 64)
+        .kv_u32("qwen3.attention.head_count", 2)
+        .kv_u32("qwen3.attention.head_count_kv", 1)
+        .kv_u32("qwen3.attention.key_length", 16)
+        .kv_u32("qwen3.attention.value_length", 16)
+        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
+        .kv_f32("qwen3.rope.freq_base", 1e6)
+        .kv_u32("qwen3.context_length", 64)
+        .kv_str("tokenizer.ggml.model", "gpt2")
+        .kv_str("tokenizer.ggml.pre", "qwen2")
+        .kv_u32("tokenizer.ggml.eos_token_id", 2)
+        .kv_arr_str(
+            "tokenizer.ggml.tokens",
+            &[
+                "a",
+                "<|endoftext|>",
+                "<|im_end|>",
+                "<|im_start|>",
+                "<tool_call>",
+            ],
+        )
+        .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3, 1])
+        .kv_arr_str("tokenizer.ggml.merges", &[])
+        .kv_str("tokenizer.chat_template", "x");
+    match load_bytes(&b.build()) {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("tool_call"), "{reason}")
+        }
+        other => panic!("{:?}", other.err()),
+    }
+}

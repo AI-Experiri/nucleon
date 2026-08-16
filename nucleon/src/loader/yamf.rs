@@ -390,6 +390,31 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             });
         }
     }
+
+    // Optional template markers the ChatML template may emit under
+    // tools/thinking modes. Their absence is fine (a file that never
+    // enables tools or thinking is legitimate), but when present
+    // they must be USER_DEFINED so the tokenizer registers them
+    // atomically instead of falling back to BPE.
+    for marker in [
+        "<tool_call>",
+        "</tool_call>",
+        "<tool_response>",
+        "</tool_response>",
+        "<think>",
+        "</think>",
+    ] {
+        if let Some(pos) = tokens.iter().position(|t| t == marker) {
+            if token_types[pos] != TokenType::UserDefined {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                        "optional marker {pos} (\"{marker}\") has token_type {:?}, expected UserDefined",
+                        token_types[pos]
+                    ),
+                });
+            }
+        }
+    }
     let mut stop_token_ids = vec![eos];
     if endoftext != eos {
         stop_token_ids.push(endoftext);
