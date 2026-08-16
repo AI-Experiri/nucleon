@@ -1,5 +1,5 @@
 use super::*;
-use crate::loader::gguf_builder::{f32_bytes, GgufBuilder, GGML_F32};
+use crate::loader::formats::gguf::builder::{f32_bytes, GgufBuilder, GGML_F32};
 
 fn tiny() -> Vec<u8> {
     GgufBuilder::new()

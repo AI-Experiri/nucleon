@@ -4,7 +4,9 @@ use super::*;
 /// smoke test. Tests only care that ChatML shape emits; the real
 /// Qwen3 template is much richer and gets exercised separately.
 const CHATML_TPL: &str = "{%- for m in messages -%}<|im_start|>{{ m.role }}\n{{ m.content }}<|im_end|>\n{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant\n{%- endif -%}";
-use crate::loader::gguf_builder::{f32_bytes, quantize_q8_0_ref, GgufBuilder, GGML_F32, GGML_Q8_0};
+use crate::loader::formats::gguf::builder::{
+    f32_bytes, quantize_q8_0_ref, GgufBuilder, GGML_F32, GGML_Q8_0,
+};
 
 // A 1-layer qwen3 mini model: hidden 32, ffn 64, 2 heads / 1 kv
 // head, head_dim 16, vocab 10. Every required tensor present;
@@ -337,7 +339,7 @@ fn oracle_candle_agrees_on_metadata_infos_and_dequant() {
     assert_eq!(content.tensor_infos.len(), 13);
 
     // our container agrees on the data offset
-    let ours = crate::loader::container::parse(&bytes).unwrap();
+    let ours = crate::loader::formats::gguf::container::parse(&bytes).unwrap();
     assert_eq!(ours.data_start as u64, content.tensor_data_offset);
 
     // dequantized values agree on the Q8_0 tensor
@@ -492,7 +494,7 @@ fn empty_arrays_keep_their_declared_element_type() {
     }
 
     // an i32-typed empty array where strings are declared: refused
-    let mut c = crate::loader::container::parse(
+    let mut c = crate::loader::formats::gguf::container::parse(
         &GgufBuilder::new()
             .kv_arr_i32("tokenizer.ggml.merges", &[])
             .build(),
@@ -1064,7 +1066,7 @@ fn nonzero_padding_between_tensors_is_refused() {
     // 32), so plant a gap deliberately: the optional output.weight is
     // forced 32 bytes past the natural end of the data region
     let packed = mini().build();
-    let c = crate::loader::container::parse(&packed).unwrap();
+    let c = crate::loader::formats::gguf::container::parse(&packed).unwrap();
     let natural_end = c
         .tensors
         .iter()
@@ -1094,7 +1096,7 @@ fn nonzero_padding_between_tensors_is_refused() {
     assert!(load_bytes(&with_gap).is_ok());
 
     // dirty one byte inside the gap: refused
-    let c = crate::loader::container::parse(&with_gap).unwrap();
+    let c = crate::loader::formats::gguf::container::parse(&with_gap).unwrap();
     let mut corrupt = with_gap.clone();
     corrupt[c.data_start + natural_end as usize] = 7;
     match load_bytes(&corrupt) {
@@ -1220,7 +1222,7 @@ fn nonzero_leading_padding_is_refused() {
     };
     let _ = with_gap;
     // dirty a byte inside the leading gap
-    let c = crate::loader::container::parse(&bytes).unwrap();
+    let c = crate::loader::formats::gguf::container::parse(&bytes).unwrap();
     let mut corrupt = bytes.clone();
     corrupt[c.data_start] = 9;
     match load_bytes(&corrupt) {

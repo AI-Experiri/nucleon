@@ -5,8 +5,8 @@
 //! a named error. The result reaches the engine wrapped in
 //! `FamilyConfig`, the one family-specific corner of the Yamf.
 
-use crate::loader::container::{Container, MetaValue};
 use crate::loader::error::LoaderError;
+use crate::loader::formats::gguf::container::{Container, MetaValue};
 
 /// The typed twin of the config keys the qwen3 family needs. One
 /// field per GGUF metadata key; values for Qwen3-0.6B in comments.

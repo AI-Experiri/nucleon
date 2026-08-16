@@ -9,7 +9,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::loader::config::{family_config, get_str, get_u32_exact, FamilyConfig, Qwen3Config};
+use crate::loader::formats::gguf::config::{
+    family_config, get_str, get_u32_exact, FamilyConfig, Qwen3Config,
+};
 
 /// Truncate an echoed untrusted string in error messages.
 fn echo(s: &str) -> String {
@@ -22,9 +24,9 @@ fn echo(s: &str) -> String {
         s.to_string()
     }
 }
-use crate::loader::container::{parse, Container, MetaValue};
-use crate::loader::dequant::{dequantize, tensor_byte_len};
 use crate::loader::error::LoaderError;
+use crate::loader::formats::gguf::container::{parse, Container, MetaValue};
+use crate::loader::formats::gguf::dequant::{dequantize, tensor_byte_len};
 use crate::tensor::Tensor;
 
 /// Token classes from the GGUF spec's token_type array.
@@ -227,7 +229,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     if container
         .tensors
         .iter()
-        .any(|t| crate::loader::dequant::is_quantized(t.type_id))
+        .any(|t| crate::loader::formats::gguf::dequant::is_quantized(t.type_id))
     {
         let qv = get_u32_exact(&container, "general.quantization_version")?;
         if qv != 2 {
@@ -622,7 +624,12 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     let mut expected = expected_tensors(cfg);
     let optional_output = vec![cfg.vocab_size as usize, cfg.hidden_size as usize];
     let region_len = container.file_len - container.data_start;
-    let mut plan: Vec<(&crate::loader::container::TensorInfo, Vec<usize>, u64, u64)> = Vec::new();
+    let mut plan: Vec<(
+        &crate::loader::formats::gguf::container::TensorInfo,
+        Vec<usize>,
+        u64,
+        u64,
+    )> = Vec::new();
     let mut ranges: Vec<(u64, u64, &str)> = Vec::new();
 
     for info in &container.tensors {

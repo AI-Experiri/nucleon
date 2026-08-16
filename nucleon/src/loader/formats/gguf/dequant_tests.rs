@@ -1,5 +1,5 @@
 use super::*;
-use crate::loader::gguf_builder::{f32_bytes, quantize_q8_0_ref};
+use crate::loader::formats::gguf::builder::{f32_bytes, quantize_q8_0_ref};
 
 #[test]
 fn f32_passes_through_bit_exactly() {

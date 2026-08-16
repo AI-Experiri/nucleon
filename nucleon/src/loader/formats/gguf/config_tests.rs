@@ -1,6 +1,6 @@
 use super::*;
-use crate::loader::container::parse;
-use crate::loader::gguf_builder::GgufBuilder;
+use crate::loader::formats::gguf::builder::GgufBuilder;
+use crate::loader::formats::gguf::container::parse;
 
 fn qwen3_kvs() -> GgufBuilder {
     GgufBuilder::new()
