@@ -1,0 +1,59 @@
+<svg width="720" height="360" viewBox="0 0 720 360" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" fill="#c0cadb" font-size="14">a 4-byte emoji ("🎯") split across two token ids</text>
+
+  <!-- Naive: bad -->
+  <text x="180" y="66" text-anchor="middle" fill="#cc5555" font-size="13">naive (decode per token)</text>
+
+  <rect x="40" y="80" width="130" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="105" y="101" text-anchor="middle" font-size="12" fill="#c0cadb">id 42815</text>
+  <text x="105" y="132" text-anchor="middle" font-size="11" opacity="0.75">bytes 0xF0 0x9F</text>
+
+  <rect x="200" y="80" width="130" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="265" y="101" text-anchor="middle" font-size="12" fill="#c0cadb">id 8317</text>
+  <text x="265" y="132" text-anchor="middle" font-size="11" opacity="0.75">bytes 0x8E 0xAF</text>
+
+  <path d="M 105 148 v 14" stroke="#cc5555" stroke-opacity="0.7" fill="none" marker-end="url(#arrD)"/>
+  <path d="M 265 148 v 14" stroke="#cc5555" stroke-opacity="0.7" fill="none" marker-end="url(#arrD)"/>
+
+  <rect x="40" y="168" width="290" height="34" rx="8" fill="rgba(204,85,85,0.10)" stroke="#cc5555" stroke-opacity="0.7"/>
+  <text x="185" y="189" text-anchor="middle" font-size="12" fill="#cc5555">"�" + "�"     (two U+FFFD, no emoji)</text>
+
+  <text x="185" y="230" text-anchor="middle" font-size="11" opacity="0.75">each half fails UTF-8 alone,</text>
+  <text x="185" y="245" text-anchor="middle" font-size="11" opacity="0.75">decoder replaces with U+FFFD</text>
+
+  <!-- DecodeStream: good -->
+  <text x="540" y="66" text-anchor="middle" fill="#9dc49d" font-size="13">DecodeStream::step</text>
+
+  <rect x="400" y="80" width="130" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="465" y="101" text-anchor="middle" font-size="12" fill="#c0cadb">step(42815)</text>
+  <text x="465" y="132" text-anchor="middle" font-size="11" opacity="0.75">2 bytes buffered</text>
+
+  <path d="M 465 148 v 14" stroke="#5e8d5e" stroke-opacity="0.7" fill="none" marker-end="url(#arrD)"/>
+
+  <rect x="400" y="168" width="130" height="34" rx="8" fill="rgba(94,141,94,0.10)" stroke="#5e8d5e" stroke-opacity="0.7"/>
+  <text x="465" y="189" text-anchor="middle" font-size="12" fill="#9dc49d">emits: None</text>
+
+  <path d="M 530 185 h 34" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrD)"/>
+
+  <rect x="570" y="80" width="130" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="635" y="101" text-anchor="middle" font-size="12" fill="#c0cadb">step(8317)</text>
+  <text x="635" y="132" text-anchor="middle" font-size="11" opacity="0.75">4 bytes complete</text>
+
+  <path d="M 635 148 v 14" stroke="#5e8d5e" stroke-opacity="0.7" fill="none" marker-end="url(#arrD)"/>
+
+  <rect x="570" y="168" width="130" height="34" rx="8" fill="rgba(94,141,94,0.10)" stroke="#5e8d5e" stroke-opacity="0.7"/>
+  <text x="635" y="189" text-anchor="middle" font-size="12" fill="#9dc49d">emits: Some("🎯")</text>
+
+  <text x="550" y="230" text-anchor="middle" font-size="11" opacity="0.75">buffer withholds until valid</text>
+  <text x="550" y="245" text-anchor="middle" font-size="11" opacity="0.75">UTF-8 boundary is reached</text>
+
+  <!-- footer note -->
+  <text x="360" y="310" text-anchor="middle" font-size="12" opacity="0.8">Same for CJK characters and any 3+ byte UTF-8 codepoint at a token boundary.</text>
+  <text x="360" y="330" text-anchor="middle" font-size="12" opacity="0.8">Same principle for combining marks that need the following byte to render.</text>
+</svg>

@@ -1,0 +1,41 @@
+<svg width="720" height="330" viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" fill="#c0cadb" font-size="14">encode("Hello world")</text>
+
+  <!-- 1. Raw text -->
+  <rect x="60" y="52" width="600" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="360" y="73" text-anchor="middle" font-size="12" fill="#c0cadb">"Hello world"</text>
+
+  <path d="M 360 90 v 14" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrE)"/>
+  <text x="450" y="102" font-size="11" opacity="0.75">Split(qwen2 regex)</text>
+
+  <!-- 2. Pre-tokenized pieces -->
+  <rect x="60" y="108" width="600" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="360" y="129" text-anchor="middle" font-size="12" fill="#c0cadb">["Hello", " world"]</text>
+
+  <path d="M 360 146 v 14" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrE)"/>
+  <text x="490" y="158" font-size="11" opacity="0.75">ByteLevel char mapping</text>
+
+  <!-- 3. Byte-level characters -->
+  <rect x="60" y="164" width="600" height="34" rx="8" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="360" y="185" text-anchor="middle" font-size="12" fill="#f0c893">["Hello", "Ġworld"]     (leading space → Ġ, i.e. byte 0x20)</text>
+
+  <path d="M 360 202 v 14" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrE)"/>
+  <text x="480" y="214" font-size="11" opacity="0.75">BPE merges, greedy by rank</text>
+
+  <!-- 4. BPE tokens -->
+  <rect x="60" y="220" width="600" height="34" rx="8" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="360" y="241" text-anchor="middle" font-size="12" fill="#f0c893">tokens: ["Hello", "Ġworld"]     (both survive as single tokens)</text>
+
+  <path d="M 360 258 v 14" stroke="#8b98a9" stroke-opacity="0.6" fill="none" marker-end="url(#arrE)"/>
+  <text x="470" y="270" font-size="11" opacity="0.75">vocab lookup</text>
+
+  <!-- 5. Ids -->
+  <rect x="60" y="276" width="600" height="34" rx="8" fill="rgba(94,141,94,0.10)" stroke="#5e8d5e" stroke-opacity="0.7"/>
+  <text x="360" y="297" text-anchor="middle" font-size="12" fill="#9dc49d">ids: [9707, 1879]     (u32 each; the model eats these)</text>
+</svg>
