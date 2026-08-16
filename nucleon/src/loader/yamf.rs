@@ -301,23 +301,8 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         }
     }
 
-    // byte-level BPE encodes raw bytes into 256 base tokens (HF
-    // ByteLevel::alphabet); if any is missing, ordinary bytes cannot
-    // be encoded at all. tokenizers has no re-export for the
-    // alphabet, so we build it the same way (bytes not in
-    // !..~ / ¡..¬ / ®..ÿ shift by +256)
-    for b in 0u16..256 {
-        let c = byte_level_char(b as u8);
-        let s: String = std::iter::once(c).collect();
-        if !vocab_set.contains(s.as_str()) {
-            return Err(LoaderError::Structure {
-                reason: format!(
-                    "byte-level base token for byte 0x{:02x} (\"{s}\") is missing from the vocab",
-                    b
-                ),
-            });
-        }
-    }
+    // token_type must come before the alphabet check: base bytes
+    // have to be typed Normal for BPE to treat them as plain bytes
     let type_ints = take_i32_array(&mut container, "tokenizer.ggml.token_type")?;
     if type_ints.len() != tokens.len() {
         return Err(LoaderError::Structure {
@@ -333,8 +318,43 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         token_types.push(TokenType::from_i32(v)?);
     }
 
+    // byte-level BPE encodes raw bytes into 256 base tokens (HF
+    // ByteLevel::alphabet); if any is missing, ordinary bytes cannot
+    // be encoded at all. Each base token must ALSO be typed Normal
+    // so the tokenizer treats it as a plain byte, not a special.
+    // tokenizers has no re-export for the alphabet, so we build it
+    // the same way (see byte_level_char).
+    let vocab_index: std::collections::HashMap<&str, usize> = tokens
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.as_str(), i))
+        .collect();
+    for b in 0u16..256 {
+        let c = byte_level_char(b as u8);
+        let s: String = std::iter::once(c).collect();
+        match vocab_index.get(s.as_str()) {
+            None => {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                    "byte-level base token for byte 0x{:02x} (\"{s}\") is missing from the vocab",
+                    b
+                ),
+                })
+            }
+            Some(&idx) => {
+                if token_types[idx] != TokenType::Normal {
+                    return Err(LoaderError::Structure {
+                        reason: format!(
+                            "byte-level base token \"{s}\" (id {idx}) has token_type {:?}, expected Normal",
+                            token_types[idx]
+                        ),
+                    });
+                }
+            }
+        }
+    }
+
     let merge_strs = take_str_array(&mut container, "tokenizer.ggml.merges")?;
-    let vocab_set: std::collections::HashSet<&str> = tokens.iter().map(|t| t.as_str()).collect();
     let mut merge_seen = std::collections::HashSet::new();
     let mut merges = Vec::with_capacity(merge_strs.len());
     for m in merge_strs {
@@ -353,12 +373,28 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         // and the gate would have lied about validating the border
         let product = format!("{a}{b}");
         for piece in [a, b, product.as_str()] {
-            if !vocab_set.contains(piece) {
+            let idx = match vocab_index.get(piece) {
+                Some(i) => *i,
+                None => {
+                    return Err(LoaderError::Structure {
+                        reason: format!(
+                            "merge \"{}\" refers to \"{}\", which is not in the vocab",
+                            echo(&m),
+                            echo(piece)
+                        ),
+                    })
+                }
+            };
+            // BPE merges only combine ordinary tokens; a merge that
+            // references a special/unused row would either never
+            // fire or fire on the wrong id
+            if token_types[idx] != TokenType::Normal {
                 return Err(LoaderError::Structure {
                     reason: format!(
-                        "merge \"{}\" refers to \"{}\", which is not in the vocab",
+                        "merge \"{}\" references non-Normal token \"{}\" (id {idx}, type {:?})",
                         echo(&m),
-                        echo(piece)
+                        echo(piece),
+                        token_types[idx]
                     ),
                 });
             }

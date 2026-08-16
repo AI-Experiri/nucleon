@@ -31,10 +31,12 @@ fn mini() -> GgufBuilder {
         ])
         .collect();
     let token_refs: Vec<&str> = tokens.iter().map(|s| s.as_str()).collect();
-    // types must match the 11 named tokens: 5 = Unused, 4 = UserDefined,
-    // 6 = Byte, 3 = Control. The builder chains with_full_byte_alphabet()
-    // which appends Normal entries for the missing alphabet characters.
-    let types: Vec<i32> = vec![1, 1, 1, 1, 1, 5, 4, 6, 3, 3, 3];
+    // types must match the 11 named tokens: 1 = Normal (mergeable
+    // BPE pieces are always Normal), 3 = Control for the specials
+    // at the end. The builder chains with_full_byte_alphabet()
+    // which appends Normal entries for the missing alphabet
+    // characters.
+    let types: Vec<i32> = vec![1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3];
 
     // embedding data: value = row * 100 + col, to pin the layout
     let embd: Vec<f32> = (0..vocab * hidden)
@@ -166,8 +168,7 @@ fn loads_a_complete_mini_model() {
     // original had a fixed 10-token vocab; the alphabet extension
     // makes byte-level tokens dominate — check the character-token
     // instead, whose type is Normal
-    assert_eq!(yamf.tokenizer.token_types[5], TokenType::Unused);
-    let _ = 0;
+    assert_eq!(yamf.tokenizer.token_types[5], TokenType::Normal);
     assert_eq!(yamf.tokenizer.token_types[8], TokenType::Control);
     assert_eq!(
         yamf.chat_template.source(),
