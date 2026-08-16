@@ -85,15 +85,30 @@ pub fn dequantize(
     match type_id {
         GGML_F32 => {
             let mut out = Vec::with_capacity(n_elems);
-            for chunk in bytes.chunks_exact(4) {
-                out.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+            for (i, chunk) in bytes.chunks_exact(4).enumerate() {
+                let v = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                if !v.is_finite() {
+                    return Err(LoaderError::Structure {
+                        reason: format!(
+                            "tensor \"{name}\" F32 value at index {i} is non-finite ({v})"
+                        ),
+                    });
+                }
+                out.push(v);
             }
             Ok(out)
         }
         GGML_Q8_0 => {
             let mut out = Vec::with_capacity(n_elems);
-            for block in bytes.chunks_exact(Q8_0_BLOCK_BYTES as usize) {
+            for (bi, block) in bytes.chunks_exact(Q8_0_BLOCK_BYTES as usize).enumerate() {
                 let d = f16::from_le_bytes([block[0], block[1]]).to_f32();
+                if !d.is_finite() {
+                    return Err(LoaderError::Structure {
+                        reason: format!(
+                            "tensor \"{name}\" Q8_0 block {bi} scale is non-finite ({d})"
+                        ),
+                    });
+                }
                 for &q in &block[2..] {
                     out.push(d * f32::from(q as i8));
                 }

@@ -75,3 +75,35 @@ fn inconsistent_elems_and_rows_are_refused() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn f32_nan_or_inf_values_are_refused() {
+    let vals = [1.0f32, f32::NAN];
+    match dequantize(GGML_F32, &f32_bytes(&vals), 2, 2, "t") {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("non-finite"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+    let vals = [f32::INFINITY, 0.0];
+    match dequantize(GGML_F32, &f32_bytes(&vals), 2, 2, "t") {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("non-finite"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn q8_0_nan_or_inf_scale_is_refused() {
+    // one block: NaN scale in f16 (0x7E00 is a quiet NaN) + 32 zeros
+    let mut block = Vec::new();
+    block.extend_from_slice(&half::f16::from_bits(0x7E00).to_le_bytes());
+    block.extend(std::iter::repeat_n(0u8, 32));
+    match dequantize(GGML_Q8_0, &block, 32, 32, "t") {
+        Err(LoaderError::Structure { reason }) => {
+            assert!(reason.contains("non-finite"), "{reason}")
+        }
+        other => panic!("{other:?}"),
+    }
+}
