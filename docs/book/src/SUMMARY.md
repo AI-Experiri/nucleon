@@ -10,7 +10,8 @@
 
 - [Tensor 0](01-tensor.md)
 - [GPU 0](02-gpu.md)
-- [Metal 0](02-metal.md)
+- [Metal](02-metal.md)
+- [MLX](03-mlx.md)
 
 # Part II: The engine
 

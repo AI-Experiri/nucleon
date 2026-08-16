@@ -1,10 +1,13 @@
-# Metal 0
+# Metal
 
-GPU 0 covered the hardware: the cores, the memories, the distances. This
-chapter writes software for it. By the end, every tensor operation from
-Tensor 0 runs on the GPU, the measurements show why kernel fusion
-matters, and the chapter closes by attaching the GPU to the same Backend
-trait the CPU lives behind.
+GPU 0 covered the hardware: the cores, the memories, the distances.
+This chapter writes software for it. By the end, we understand what a
+kernel is, what the launch cost of a chain of ops looks like on real
+hardware, and the difference between running them one at a time
+(composed) versus one kernel that does the whole job at once (fused).
+The next chapter, [MLX](03-mlx.md), picks up exactly there — MLX is
+Apple's library that already writes the fused kernels at scale, and
+becomes nucleon's compute layer.
 
 ## 4.1 Metal: the library that drives the GPU
 
@@ -335,49 +338,17 @@ three rules hold everywhere in the crate:
 3. On a machine with no GPU, every test prints that it is skipping;
    a kernel compile error still fails the suite instead of skipping.
 
-## 4.9 Attaching the GPU trait
+## 4.9 What comes next
 
-The chapter's closing move: `MetalBackend` implements the same `Backend`
-trait as `CpuBackend`. Each method converts a `Tensor` to the flat
-slices kernels speak, dispatches, and wraps the result back:
+The kernels in this chapter (`kernels/*.metal`, referenced from
+`docs/book/src/reference/kernels/`) are correct but naive on purpose:
+they teach *what a kernel is* and *what composed vs fused costs*.
+The mature versions of these ideas — tiled matmul, FlashAttention,
+simdgroup matrix intrinsics — are exactly what Apple's MLX library
+already implements at scale. Rather than rewrite them badly ourselves
+in a book that already made the teaching point, nucleon's compute
+layer becomes MLX.
 
-```rust
-impl Backend for MetalBackend {
-    fn matvec(&self, w: &Tensor, x: &Tensor) -> Tensor {
-        Tensor::new(vec![w.shape()[0]], self.ops.matvec(w.data(), x.data()))
-    }
-    // ... every other op, the same shape of delegation
-}
-```
-
-Attention is where the trait design pays off. Because it is one method,
-the GPU implements it as ONE kernel: scores, softmax, and the weighted
-value sum in a single dispatch, the score row living in fast threadgroup
-memory and never touching RAM. Composition (matmul kernel, softmax
-kernel, matmul kernel) would have forced three round trips.
-
-The contract holding it all together is trait-level parity: the same
-calls through the same trait, CPU vs GPU, must agree within a small
-tolerance (exact equality is the wrong bar, because GPU threads add
-floats in a different order than a CPU loop does). The parity suite
-covers every op, edge sizes that exercise idle reduction lanes, NaN
-and -inf behavior, and grouped-query attention at sequence lengths
-past the thread-count boundaries. From here on, any code written against
-`Backend` runs on either executor, and the story never has to ask which.
-
-## 4.10 Upcoming Metal topics
-
-The kernels in this chapter are correct but naive on purpose. The GPU
-returns in [The Fast Kernels](11-fast-kernels.md) to build these; each
-teaches a specific technique:
-
-1. **Tiled matmul**: load a block of data into threadgroup memory and
-   have all 256 threads reuse it many times before sliding to the next
-   block (data reuse inside one kernel).
-2. **FlashAttention**: attention computed over K and V tiles with a
-   running max and sum, so the full score row never exists; this
-   removes our attention kernel's seq 4096 cap (online softmax).
-3. **simdgroup_matrix**: the matrix-multiply intrinsics API, and what
-   changes when M5 adds dedicated hardware behind it.
-4. **Benchmarks**: every step measured against llama.cpp and MLX on the
-   same machine.
+The next chapter, [MLX](03-mlx.md), picks up here: what MLX gives us
+on top of what this chapter taught, how composed and fused look in
+MLX code, and which fused ops carry the Qwen3 forward pass.

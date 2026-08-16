@@ -1,0 +1,51 @@
+<svg width="720" height="320" viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <!-- nucleon (top) -->
+  <rect x="230" y="20" width="260" height="46" rx="10" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="360" y="42" text-anchor="middle" fill="#f0c893">nucleon (this project, Rust)</text>
+  <text x="360" y="58" text-anchor="middle" font-size="11" opacity="0.75">our engine code</text>
+
+  <path d="M 360 68 v 22" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrM)"/>
+  <text x="510" y="82" font-size="11" opacity="0.75">Cargo dep: mlx-rs = "=0.25.3"</text>
+
+  <!-- mlx-rs -->
+  <rect x="230" y="94" width="260" height="46" rx="10" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="360" y="116" text-anchor="middle" fill="#c0cadb">mlx-rs 0.25.3</text>
+  <text x="360" y="132" text-anchor="middle" font-size="11" opacity="0.75">community wrapper (oxideai)</text>
+
+  <path d="M 360 142 v 22" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrM)"/>
+  <text x="510" y="156" font-size="11" opacity="0.75">FFI via mlx-sys → mlx-c submodule</text>
+
+  <!-- mlx-c -->
+  <rect x="230" y="168" width="260" height="46" rx="10" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="360" y="190" text-anchor="middle" fill="#c0cadb">mlx-c 0.5.0</text>
+  <text x="360" y="206" text-anchor="middle" font-size="11" opacity="0.75">Apple's C API</text>
+
+  <path d="M 360 216 v 22" stroke="#8b98a9" stroke-opacity="0.7" fill="none" marker-end="url(#arrM)"/>
+  <text x="510" y="230" font-size="11" opacity="0.75">CMake FetchContent</text>
+
+  <!-- mlx -->
+  <rect x="230" y="242" width="260" height="46" rx="10" fill="rgba(94,141,94,0.10)" stroke="#5e8d5e" stroke-opacity="0.7"/>
+  <text x="360" y="264" text-anchor="middle" fill="#9dc49d">MLX 0.30.6</text>
+  <text x="360" y="280" text-anchor="middle" font-size="11" opacity="0.75">Apple's C++ core, Metal-native</text>
+
+  <!-- what nucleon controls, what it doesn't -->
+  <rect x="30" y="20" width="180" height="268" rx="10" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5" stroke-dasharray="6 4"/>
+  <text x="120" y="46" text-anchor="middle" font-size="12" fill="#c0cadb">we control</text>
+  <text x="120" y="66" text-anchor="middle" font-size="11" opacity="0.8">only the top pin</text>
+  <text x="120" y="110" text-anchor="middle" font-size="12" fill="#c0cadb" opacity="0.5">we don't control</text>
+  <text x="120" y="130" text-anchor="middle" font-size="11" opacity="0.55">middleware chain;</text>
+  <text x="120" y="145" text-anchor="middle" font-size="11" opacity="0.55">whatever mlx-rs</text>
+  <text x="120" y="160" text-anchor="middle" font-size="11" opacity="0.55">chose is what we</text>
+  <text x="120" y="175" text-anchor="middle" font-size="11" opacity="0.55">build against</text>
+
+  <!-- static link note -->
+  <rect x="510" y="242" width="180" height="46" rx="10" fill="rgba(139,152,169,0.05)" stroke="#8b98a9" stroke-opacity="0.5" stroke-dasharray="6 4"/>
+  <text x="600" y="262" text-anchor="middle" font-size="11" opacity="0.8">baked into our binary,</text>
+  <text x="600" y="278" text-anchor="middle" font-size="11" opacity="0.8">system MLX not used</text>
+</svg>
