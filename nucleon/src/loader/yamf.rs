@@ -10,6 +10,18 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use crate::loader::config::{family_config, get_str, get_u32_exact, FamilyConfig, Qwen3Config};
+
+/// Truncate an echoed untrusted string in error messages.
+fn echo(s: &str) -> String {
+    const MAX: usize = 64;
+    if s.chars().count() > MAX {
+        let mut out: String = s.chars().take(MAX).collect();
+        out.push_str("...");
+        out
+    } else {
+        s.to_string()
+    }
+}
 use crate::loader::container::{parse, Container, MetaValue};
 use crate::loader::dequant::{dequantize, tensor_byte_len};
 use crate::loader::error::LoaderError;
@@ -156,7 +168,7 @@ pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
             reason: format!("{} is not a regular file", path.display()),
         });
     }
-    let mut file = std::fs::File::open(path)?;
+    let file = std::fs::File::open(path)?;
     let meta = file.metadata()?;
     if !meta.is_file() {
         return Err(LoaderError::Structure {
@@ -164,7 +176,9 @@ pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
         });
     }
     // 100 GB caps everything the plan targets (Qwen3.8-27B GGUF at
-    // f16 is 56 GB) and refuses hostile huge files before the read
+    // f16 is 56 GB); the metadata length is only a hint. The read
+    // itself is capped so a file growing between check and read
+    // cannot escape.
     const MAX_FILE_BYTES: u64 = 100 * 1024 * 1024 * 1024;
     if meta.len() > MAX_FILE_BYTES {
         return Err(LoaderError::Structure {
@@ -176,7 +190,16 @@ pub fn load(path: &Path) -> Result<Yamf, LoaderError> {
         });
     }
     let mut bytes = Vec::with_capacity(meta.len() as usize);
-    file.read_to_end(&mut bytes)?;
+    let mut capped = file.take(MAX_FILE_BYTES + 1);
+    capped.read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "{} grew past {MAX_FILE_BYTES} bytes during load",
+                path.display()
+            ),
+        });
+    }
     load_bytes(&bytes)
 }
 
@@ -216,13 +239,16 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     let model = get_str(&container, "tokenizer.ggml.model")?;
     if model != "gpt2" {
         return Err(LoaderError::Structure {
-            reason: format!("tokenizer model \"{model}\"; nucleon supports: gpt2 (byte-level BPE)"),
+            reason: format!(
+                "tokenizer model \"{}\"; nucleon supports: gpt2 (byte-level BPE)",
+                echo(model)
+            ),
         });
     }
     let pre = get_str(&container, "tokenizer.ggml.pre")?.to_string();
     if pre != "qwen2" {
         return Err(LoaderError::Structure {
-            reason: format!("pre-tokenizer \"{pre}\"; nucleon supports: qwen2"),
+            reason: format!("pre-tokenizer \"{}\"; nucleon supports: qwen2", echo(&pre)),
         });
     }
     let eos = get_u32_exact(&container, "tokenizer.ggml.eos_token_id")?;
@@ -294,7 +320,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             Some((a, b)) if !a.is_empty() && !b.is_empty() && !b.contains(' ') => (a, b),
             _ => {
                 return Err(LoaderError::Structure {
-                    reason: format!("malformed merge entry \"{m}\""),
+                    reason: format!("malformed merge entry \"{}\"", echo(&m)),
                 })
             }
         };
@@ -306,14 +332,16 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             if !vocab_set.contains(piece) {
                 return Err(LoaderError::Structure {
                     reason: format!(
-                        "merge \"{m}\" refers to \"{piece}\", which is not in the vocab"
+                        "merge \"{}\" refers to \"{}\", which is not in the vocab",
+                        echo(&m),
+                        echo(piece)
                     ),
                 });
             }
         }
         if !merge_seen.insert((a.to_string(), b.to_string())) {
             return Err(LoaderError::Structure {
-                reason: format!("duplicate merge entry \"{m}\""),
+                reason: format!("duplicate merge entry \"{}\"", echo(&m)),
             });
         }
         merges.push((a.to_string(), b.to_string()));
@@ -336,7 +364,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         return Err(LoaderError::Structure {
             reason: format!(
                 "eos_token_id {eos} names \"{}\", expected \"<|im_end|>\"",
-                tokens[eos as usize]
+                echo(&tokens[eos as usize])
             ),
         });
     }
@@ -348,7 +376,8 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             return Err(LoaderError::Structure {
                 reason: format!(
                     "stop token {id} (\"{}\") has token_type {:?}, expected Control",
-                    tokens[id as usize], token_types[id as usize]
+                    echo(&tokens[id as usize]),
+                    token_types[id as usize]
                 ),
             });
         }

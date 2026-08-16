@@ -122,7 +122,7 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
         intermediate_size: get_u32(c, "qwen3.feed_forward_length")?,
         num_attention_heads: get_u32(c, "qwen3.attention.head_count")?,
         num_key_value_heads: get_u32(c, "qwen3.attention.head_count_kv")?,
-        head_dim: get_u32(c, "qwen3.attention.key_length")?,
+        head_dim: get_u32_exact(c, "qwen3.attention.key_length")?,
         rms_norm_eps: get_f32(c, "qwen3.attention.layer_norm_rms_epsilon")?,
         rope_theta: get_f32(c, "qwen3.rope.freq_base")?,
         max_position_embeddings: get_u32(c, "qwen3.context_length")?,
@@ -132,7 +132,7 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
     // The file also declares a value-head length. Our attention op
     // computes k and v at one head_dim, so the two must agree; a
     // family where they differ is refused, not misread.
-    let value_length = get_u32(c, "qwen3.attention.value_length")?;
+    let value_length = get_u32_exact(c, "qwen3.attention.value_length")?;
     if value_length != cfg.head_dim {
         return Err(LoaderError::Structure {
             reason: format!(

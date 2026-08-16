@@ -1122,3 +1122,20 @@ fn nonzero_leading_padding_is_refused() {
         other => panic!("{:?}", other.err()),
     }
 }
+
+#[test]
+fn hostile_echoes_are_truncated_in_errors() {
+    let long = "z".repeat(500);
+    // hostile tokenizer.ggml.model gets echoed but not verbatim
+    let b = base_kvs(
+        &long,
+        "qwen2",
+        0,
+        &["a", "<|endoftext|>", "<|im_end|>"],
+        &[],
+        "x",
+    );
+    let err = load_bytes(&b.build()).err().unwrap().to_string();
+    assert!(err.contains("..."), "{err}");
+    assert!(err.len() < 300, "echoed too much: {} bytes", err.len());
+}
