@@ -278,6 +278,7 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         }
     }
     let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
+    let template_source_ref = template_src.clone();
     let chat_template = ChatTemplate::new(template_src)?;
 
     let mut container = container; // consume the arrays without cloning
@@ -455,19 +456,28 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     // has passed structural checks; now prove the template really
     // emits ChatML with them, so a syntactically valid but non-
     // ChatML template does not load and later render broken prompts.
-    // canary strings that MUST appear in the rendered output IN ORDER:
-    // markers plus the sample role and content. A template that
-    // hardcodes the markers but ignores the message would still fail
-    // because "user" and the content string are checked in place.
+    // canary strings that MUST appear in the rendered output IN
+    // ORDER: markers, both roles, both contents. Uses two distinct
+    // nonces, so a template that hardcodes canary text or that only
+    // renders messages[0] both fail. The nonces are asserted absent
+    // from template_source_ref so a template that literalizes them
+    // cannot slip through.
+    let user_nonce = "nucleon_smoke_user_9c31f2";
+    let asst_nonce = "nucleon_smoke_assistant_44a7e0";
+    if template_source_ref.contains(user_nonce) || template_source_ref.contains(asst_nonce) {
+        return Err(LoaderError::Template {
+            reason: "chat template contains a smoke-test nonce literally; nonce clash".to_string(),
+        });
+    }
     let smoke = chat_template
         .environment()
         .get_template("chat")
         .expect("added at ChatTemplate::new")
         .render(minijinja::context! {
-            messages => vec![minijinja::context! {
-                role => "user",
-                content => "nucleon_smoke_content",
-            }],
+            messages => vec![
+                minijinja::context! { role => "user", content => user_nonce },
+                minijinja::context! { role => "assistant", content => asst_nonce },
+            ],
             add_generation_prompt => true,
             enable_thinking => false,
         })
@@ -478,7 +488,11 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     for marker in [
         "<|im_start|>",
         "user",
-        "nucleon_smoke_content",
+        user_nonce,
+        "<|im_end|>",
+        "<|im_start|>",
+        "assistant",
+        asst_nonce,
         "<|im_end|>",
         "<|im_start|>assistant",
     ] {
@@ -585,11 +599,48 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             });
         }
     }
+    // trailing bytes after the last tensor must also be zero
+    if let Some(last) = ranges.last() {
+        let tail_start = container.data_start + last.1 as usize;
+        let tail_end = container.data_start + region_len;
+        if bytes[tail_start..tail_end].iter().any(|b| *b != 0) {
+            return Err(LoaderError::Structure {
+                reason: format!("trailing bytes after tensor \"{}\" are not zeroed", last.2),
+            });
+        }
+    }
 
     if !expected.is_empty() {
         // deterministic diagnostics: name the alphabetically first
         let name = expected.keys().min().expect("nonempty").clone();
         return Err(LoaderError::MissingTensor { name });
+    }
+
+    // decoded-memory budget: dequant expands Q8_0 to ~3.76x while
+    // load_bytes also holds the raw file bytes. 120 GB fits the
+    // flagship Qwen3.8-27B Q8_0 (~104 GB dequantized); anything
+    // bigger refuses cleanly instead of OOM-aborting.
+    const MAX_DECODED_BYTES: u64 = 120 * 1024 * 1024 * 1024;
+    let mut decoded_bytes: u64 = 0;
+    for (info, _shape, n_elems, _byte_len) in &plan {
+        let elem_total = n_elems
+            .checked_mul(4)
+            .ok_or_else(|| LoaderError::Structure {
+                reason: format!("tensor \"{}\" decoded size overflows", info.name),
+            })?;
+        decoded_bytes =
+            decoded_bytes
+                .checked_add(elem_total)
+                .ok_or_else(|| LoaderError::Structure {
+                    reason: "total decoded size overflows".to_string(),
+                })?;
+    }
+    if decoded_bytes > MAX_DECODED_BYTES {
+        return Err(LoaderError::Structure {
+            reason: format!(
+                "dequantized weights would be {decoded_bytes} bytes; nucleon caps at {MAX_DECODED_BYTES}"
+            ),
+        });
     }
 
     // ---- pass 3: everything validated; now materialize the weights.
