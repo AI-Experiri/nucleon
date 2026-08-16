@@ -368,14 +368,22 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
             ),
         });
     }
-    // both stop tokens must be typed Control: anything else means
-    // the tokenizer will not register them as special, and the
-    // template's markers would tokenize as plain text
-    for id in [eos, endoftext] {
+    // both stop tokens AND the ChatML opener the template emits
+    // must be typed Control: anything else and the tokenizer will
+    // not register them as special, so template markers would
+    // tokenize as plain text
+    let im_start = tokens
+        .iter()
+        .position(|t| t == "<|im_start|>")
+        .ok_or_else(|| LoaderError::Structure {
+            reason: "vocab has no <|im_start|> token; the ChatML template cannot render"
+                .to_string(),
+        })? as u32;
+    for id in [eos, endoftext, im_start] {
         if token_types[id as usize] != TokenType::Control {
             return Err(LoaderError::Structure {
                 reason: format!(
-                    "stop token {id} (\"{}\") has token_type {:?}, expected Control",
+                    "template marker {id} (\"{}\") has token_type {:?}, expected Control",
                     echo(&tokens[id as usize]),
                     token_types[id as usize]
                 ),

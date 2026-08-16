@@ -209,6 +209,27 @@ pub fn family_config(c: &Container) -> Result<FamilyConfig, LoaderError> {
         });
     }
 
+    // Architecture-affecting keys we do not implement. Real Qwen3
+    // variants use these; silently ignoring them would let a file
+    // load whose math the engine then gets wrong. Base Qwen3-0.6B
+    // carries none of these.
+    for key in [
+        "qwen3.rope.scaling.type",
+        "qwen3.rope.scaling.factor",
+        "qwen3.rope.scaling.original_context_length",
+        "qwen3.rope.dimension_count",
+        "qwen3.tensor_data_layout",
+        "qwen3.attention.output_gate",
+        "qwen3.attention.partial_rotary_factor",
+        "qwen3.full_attention_interval",
+    ] {
+        if c.metadata.contains_key(key) {
+            return Err(LoaderError::Structure {
+                reason: format!("key \"{key}\" is present but nucleon does not implement it yet"),
+            });
+        }
+    }
+
     Ok(FamilyConfig::Qwen3(cfg))
 }
 

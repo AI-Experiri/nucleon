@@ -231,10 +231,13 @@ impl GgufBuilder {
         let data_start = out.len();
         for (off, bytes) in blobs {
             let at = data_start + off as usize;
-            if out.len() < at {
-                out.resize(at, 0);
+            let end = at + bytes.len();
+            if out.len() < end {
+                out.resize(end, 0);
             }
-            out.extend_from_slice(bytes);
+            // write in place at the declared offset; overlapping or
+            // backward-offset fixtures behave the way the header says
+            out[at..end].copy_from_slice(bytes);
         }
         out
     }
