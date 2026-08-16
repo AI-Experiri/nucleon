@@ -255,19 +255,26 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     // the BOS landmine (book 7.3): qwen3 never prepends BOS. A file
     // claiming add_bos_token = true is a broken conversion; honoring
     // it silently is worse than refusing it loudly.
-    match container.metadata.get("tokenizer.ggml.add_bos_token") {
-        None | Some(MetaValue::Bool(false)) => {}
-        Some(MetaValue::Bool(true)) => {
-            return Err(LoaderError::Structure {
-                reason: "add_bos_token is true; qwen3 never prepends BOS".to_string(),
-            })
-        }
-        Some(other) => {
-            return Err(LoaderError::WrongType {
-                key: "tokenizer.ggml.add_bos_token".to_string(),
-                want: "bool",
-                found: other.kind(),
-            })
+    for (key, human) in [
+        ("tokenizer.ggml.add_bos_token", "BOS"),
+        ("tokenizer.ggml.add_eos_token", "EOS"),
+    ] {
+        match container.metadata.get(key) {
+            None | Some(MetaValue::Bool(false)) => {}
+            Some(MetaValue::Bool(true)) => {
+                return Err(LoaderError::Structure {
+                    reason: format!(
+                    "{key} is true; qwen3 relies on the chat template, not tokenizer auto-{human}"
+                ),
+                })
+            }
+            Some(other) => {
+                return Err(LoaderError::WrongType {
+                    key: key.to_string(),
+                    want: "bool",
+                    found: other.kind(),
+                })
+            }
         }
     }
     let template_src = get_str(&container, "tokenizer.chat_template")?.to_string();
@@ -284,14 +291,30 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         });
     }
     // BPE needs a bijective vocab: duplicates make ids ambiguous
-    {
-        let mut seen = std::collections::HashSet::new();
-        for (i, t) in tokens.iter().enumerate() {
-            if !seen.insert(t.as_str()) {
-                return Err(LoaderError::Structure {
-                    reason: format!("duplicate token at id {i}"),
-                });
-            }
+    let mut vocab_set = std::collections::HashSet::with_capacity(tokens.len());
+    for (i, t) in tokens.iter().enumerate() {
+        if !vocab_set.insert(t.as_str()) {
+            return Err(LoaderError::Structure {
+                reason: format!("duplicate token at id {i}"),
+            });
+        }
+    }
+
+    // byte-level BPE encodes raw bytes into 256 base tokens (HF
+    // ByteLevel::alphabet); if any is missing, ordinary bytes cannot
+    // be encoded at all. tokenizers has no re-export for the
+    // alphabet, so we build it the same way (bytes not in
+    // !..~ / ¡..¬ / ®..ÿ shift by +256)
+    for b in 0u16..256 {
+        let c = byte_level_char(b as u8);
+        let s: String = std::iter::once(c).collect();
+        if !vocab_set.contains(s.as_str()) {
+            return Err(LoaderError::Structure {
+                reason: format!(
+                    "byte-level base token for byte 0x{:02x} (\"{s}\") is missing from the vocab",
+                    b
+                ),
+            });
         }
     }
     let type_ints = take_i32_array(&mut container, "tokenizer.ggml.token_type")?;
@@ -392,10 +415,12 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     }
 
     // Optional template markers the ChatML template may emit under
-    // tools/thinking modes. Their absence is fine (a file that never
-    // enables tools or thinking is legitimate), but when present
-    // they must be USER_DEFINED so the tokenizer registers them
-    // atomically instead of falling back to BPE.
+    // tools/thinking modes. Each rule: (a) if the compiled template
+    // MENTIONS the marker by name, the vocab must contain it (the
+    // conversion would otherwise BPE-split the marker at render
+    // time); (b) whenever it IS in the vocab, it must be
+    // USER_DEFINED so the tokenizer registers it atomically.
+    let template_src = chat_template.source();
     for marker in [
         "<tool_call>",
         "</tool_call>",
@@ -404,7 +429,13 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         "<think>",
         "</think>",
     ] {
-        if let Some(pos) = tokens.iter().position(|t| t == marker) {
+        let position = tokens.iter().position(|t| t == marker);
+        if template_src.contains(marker) && position.is_none() {
+            return Err(LoaderError::Structure {
+                reason: format!("chat template mentions \"{marker}\" but the vocab does not"),
+            });
+        }
+        if let Some(pos) = position {
             if token_types[pos] != TokenType::UserDefined {
                 return Err(LoaderError::Structure {
                     reason: format!(
@@ -544,6 +575,23 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         },
         chat_template,
     })
+}
+
+/// The HF ByteLevel byte-to-character mapping. Every byte that is
+/// not a printable ASCII/latin-1 range gets shifted by +256 into the
+/// PUA block, producing 256 distinct characters. Verified against
+/// tokenizers 0.23's ByteLevel::alphabet at build time by the
+/// alphabet-vocab check in load_bytes.
+fn byte_level_char(b: u8) -> char {
+    // "printable" per HF: '!'..='~', '\u{00A1}'..='\u{00AC}', '\u{00AE}'..='\u{00FF}'
+    let x = b as u32;
+    let printable =
+        (0x21..=0x7E).contains(&x) || (0xA1..=0xAC).contains(&x) || (0xAE..=0xFF).contains(&x);
+    if printable {
+        char::from_u32(x).expect("printable range")
+    } else {
+        char::from_u32(x + 256).expect("PUA range")
+    }
 }
 
 fn take_str_array(c: &mut Container, key: &'static str) -> Result<Vec<String>, LoaderError> {

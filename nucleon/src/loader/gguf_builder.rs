@@ -103,6 +103,60 @@ impl GgufBuilder {
         self
     }
 
+    /// Byte-level BPE completeness helper: append any of the 256
+    /// alphabet entries missing from `tokenizer.ggml.tokens`, and
+    /// extend the matching `tokenizer.ggml.token_type` array with
+    /// Normal (1). Tests that only care about a specific refusal
+    /// (config sanity, missing im_start, etc.) call this so the
+    /// alphabet check does not fire first.
+    pub(crate) fn with_full_byte_alphabet(mut self) -> Self {
+        fn bl(b: u8) -> char {
+            let x = b as u32;
+            let printable = (0x21..=0x7E).contains(&x)
+                || (0xA1..=0xAC).contains(&x)
+                || (0xAE..=0xFF).contains(&x);
+            if printable {
+                char::from_u32(x).unwrap()
+            } else {
+                char::from_u32(x + 256).unwrap()
+            }
+        }
+        let mut token_idx = None;
+        let mut type_idx = None;
+        for (i, kv) in self.kvs.iter().enumerate() {
+            match kv {
+                Kv::ArrStr(k, _) if k == "tokenizer.ggml.tokens" => token_idx = Some(i),
+                Kv::ArrI32(k, _) if k == "tokenizer.ggml.token_type" => type_idx = Some(i),
+                _ => {}
+            }
+        }
+        if let Some(ti) = token_idx {
+            let existing: std::collections::HashSet<String> =
+                if let Kv::ArrStr(_, items) = &self.kvs[ti] {
+                    items.iter().cloned().collect()
+                } else {
+                    unreachable!()
+                };
+            let mut appended: Vec<String> = Vec::new();
+            for b in 0..=255u16 {
+                let s: String = std::iter::once(bl(b as u8)).collect();
+                if !existing.contains(&s) {
+                    appended.push(s);
+                }
+            }
+            let appended_count = appended.len();
+            if let Kv::ArrStr(_, items) = &mut self.kvs[ti] {
+                items.extend(appended);
+            }
+            if let Some(ty) = type_idx {
+                if let Kv::ArrI32(_, items) = &mut self.kvs[ty] {
+                    items.extend(std::iter::repeat_n(1, appended_count));
+                }
+            }
+        }
+        self
+    }
+
     pub(crate) fn kv_arr_i32(mut self, k: &str, v: &[i32]) -> Self {
         self.kvs.push(Kv::ArrI32(k.into(), v.to_vec()));
         self

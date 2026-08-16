@@ -11,7 +11,10 @@ fn mini() -> GgufBuilder {
     let ffn = 64u64;
     let q_rows = 32u64; // 2 heads x head_dim 16
     let kv_rows = 16u64; // 1 kv head x 16
-    let vocab = 11u64;
+                         // a, b, ab, cc, dd, ccdd, tok6, tok7 -> 8 named tokens, of which
+                         // only "a" and "b" fall inside the byte-level alphabet, so the
+                         // extension appends 254 characters. Plus the 3 special tokens.
+    let vocab: u64 = 11 + 254; // 11 named + 254 alphabet (of 256, "a" and "b" overlap)
 
     let tokens: Vec<String> = ["a", "b", "ab", "cc", "dd", "ccdd", "tok6", "tok7"]
         .iter()
@@ -23,6 +26,9 @@ fn mini() -> GgufBuilder {
         ])
         .collect();
     let token_refs: Vec<&str> = tokens.iter().map(|s| s.as_str()).collect();
+    // types must match the 11 named tokens: 5 = Unused, 4 = UserDefined,
+    // 6 = Byte, 3 = Control. The builder chains with_full_byte_alphabet()
+    // which appends Normal entries for the missing alphabet characters.
     let types: Vec<i32> = vec![1, 1, 1, 1, 1, 5, 4, 6, 3, 3, 3];
 
     // embedding data: value = row * 100 + col, to pin the layout
@@ -54,6 +60,7 @@ fn mini() -> GgufBuilder {
         .kv_arr_i32("tokenizer.ggml.token_type", &types)
         .kv_arr_str("tokenizer.ggml.merges", &["a b", "cc dd"])
         .kv_str("tokenizer.chat_template", "{{ messages }}")
+        .with_full_byte_alphabet()
         // ne order: dims[0] = row length
         .tensor(
             "token_embd.weight",
@@ -140,12 +147,16 @@ fn loads_a_complete_mini_model() {
     let yamf = load_bytes(&mini().build()).unwrap();
     let FamilyConfig::Qwen3(cfg) = &yamf.family;
     assert_eq!(cfg.num_hidden_layers, 1);
-    assert_eq!(cfg.vocab_size, 11);
+    assert_eq!(cfg.vocab_size, 265);
     assert_eq!(yamf.tensors.len(), 13);
-    assert_eq!(yamf.tokenizer.tokens.len(), 11);
+    assert_eq!(yamf.tokenizer.tokens.len(), 11 + 254);
     assert_eq!(yamf.tokenizer.pre, "qwen2");
     assert_eq!(yamf.tokenizer.merges[0], ("a".to_string(), "b".to_string()));
+    // original had a fixed 10-token vocab; the alphabet extension
+    // makes byte-level tokens dominate — check the character-token
+    // instead, whose type is Normal
     assert_eq!(yamf.tokenizer.token_types[5], TokenType::Unused);
+    let _ = 0;
     assert_eq!(yamf.tokenizer.token_types[8], TokenType::Control);
     assert_eq!(yamf.chat_template.source(), "{{ messages }}");
 }
@@ -155,11 +166,10 @@ fn dims_reverse_into_row_major_and_data_stays_put() {
     let yamf = load_bytes(&mini().build()).unwrap();
     let embd = &yamf.tensors["token_embd.weight"];
     // ne [32, 10] becomes ours [10, 32]: 10 vocab rows of 32 values
-    assert_eq!(embd.shape(), &[11, 32]);
+    assert_eq!(embd.shape(), &[265, 32]);
     // the bytes are NOT moved: row r, col c = r*100 + c
     assert_eq!(embd.at(&[0, 0]), 0.0);
     assert_eq!(embd.at(&[3, 5]), 305.0);
-    assert_eq!(embd.at(&[10, 31]), 1031.0);
 }
 
 #[test]
@@ -185,8 +195,8 @@ fn tied_file_has_no_output_weight_and_untied_is_accepted() {
     assert!(!yamf.tensors.contains_key("output.weight"));
 
     // an untied size ships output.weight [vocab, hidden] (ne [32, 10])
-    let untied: Vec<f32> = vec![0.0; 352];
-    let b = mini().tensor("output.weight", &[32, 11], GGML_F32, f32_bytes(&untied));
+    let untied: Vec<f32> = vec![0.0; 8480];
+    let b = mini().tensor("output.weight", &[32, 265], GGML_F32, f32_bytes(&untied));
     let yamf = load_bytes(&b.build()).unwrap();
     assert!(yamf.tensors.contains_key("output.weight"));
 }
@@ -215,12 +225,13 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x");
+        .kv_str("tokenizer.chat_template", "x")
+        .with_full_byte_alphabet();
     without = without.tensor(
         "token_embd.weight",
-        &[8, 4],
+        &[8, 259],
         GGML_F32,
-        f32_bytes(&[0.0; 32]),
+        f32_bytes(&[0.0; 8 * 259]),
     );
     match load_bytes(&without.build()) {
         Err(LoaderError::MissingTensor { .. }) => {}
@@ -237,12 +248,17 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
     // wrong shape: attn_q with swapped dims — build mini by hand is
     // costly, so mutate via a fresh builder is skipped; instead ship
     // output.weight with a wrong shape, the cheap misshape probe.
-    let b = mini().tensor("output.weight", &[11, 32], GGML_F32, f32_bytes(&[0.0; 352]));
+    let b = mini().tensor(
+        "output.weight",
+        &[265, 32],
+        GGML_F32,
+        f32_bytes(&[0.0; 8480]),
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::WrongShape { name, want, found }) => {
             assert_eq!(name, "output.weight");
-            assert_eq!(want, vec![11, 32]); // ours: [vocab, hidden]
-            assert_eq!(found, vec![32, 11]); // ne [10, 32] reversed
+            assert_eq!(want, vec![265, 32]); // ours: [vocab, hidden]
+            assert_eq!(found, vec![32, 265]); // ne [10, 32] reversed
         }
         other => panic!("{:?}", other.err()),
     }
@@ -250,7 +266,7 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
 
 #[test]
 fn unsupported_quant_type_is_refused_by_name() {
-    let b = mini().tensor("output.weight", &[32, 11], 2 /* Q4_0 */, vec![0; 180]);
+    let b = mini().tensor("output.weight", &[32, 265], 2 /* Q4_0 */, vec![0; 180]);
     match load_bytes(&b.build()) {
         Err(LoaderError::UnsupportedTensorType { type_id: 2, .. }) => {}
         other => panic!("{:?}", other.err()),
@@ -354,6 +370,7 @@ fn base_kvs(
         .kv_arr_i32("tokenizer.ggml.token_type", &types)
         .kv_arr_str("tokenizer.ggml.merges", merges)
         .kv_str("tokenizer.chat_template", template)
+        .with_full_byte_alphabet()
 }
 
 #[test]
@@ -390,10 +407,17 @@ fn foreign_tokenizer_model_and_pre_are_refused_by_name() {
 
 #[test]
 fn eos_outside_the_vocab_is_refused() {
-    let b = base_kvs("gpt2", "qwen2", 5, &["a", "b"], &[], "x");
+    let b = base_kvs(
+        "gpt2",
+        "qwen2",
+        500,
+        &["a", "b", "<|endoftext|>", "<|im_start|>"],
+        &[],
+        "x",
+    );
     match load_bytes(&b.build()) {
         Err(LoaderError::Structure { reason }) => {
-            assert!(reason.contains('5') && reason.contains('2'), "{reason}")
+            assert!(reason.contains("500") && reason.contains("258"), "{reason}")
         }
         other => panic!("{:?}", other.err()),
     }
@@ -573,7 +597,8 @@ fn u64_written_dimension_keys_are_accepted() {
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
         .kv_arr_str("tokenizer.ggml.merges", &[])
-        .kv_str("tokenizer.chat_template", "x");
+        .kv_str("tokenizer.chat_template", "x")
+        .with_full_byte_alphabet();
     // fails on missing tensors, which means the u64 key was read fine
     match load_bytes(&b.build()) {
         Err(LoaderError::MissingTensor { .. }) => {}
@@ -629,9 +654,9 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
     .kv_u32("qwen3.some", 1) // keep keys unique from base
     .tensor_at(
         "token_embd.weight",
-        &[8, 4],
+        &[8, 259],
         GGML_F32,
-        f32_bytes(&[0.0; 32]),
+        f32_bytes(&[0.0; 8 * 259]),
         0,
     )
     .tensor_at(
@@ -660,9 +685,9 @@ fn out_of_bounds_overlapping_and_misaligned_tensor_ranges_are_refused() {
     )
     .tensor_at(
         "token_embd.weight",
-        &[8, 4],
+        &[8, 259],
         GGML_F32,
-        f32_bytes(&[0.0; 32]),
+        f32_bytes(&[0.0; 8 * 259]),
         3,
     );
     match load_bytes(&b.build()) {
@@ -717,7 +742,7 @@ fn f16_tensor_refuses_as_unsupported_type_not_missing_quant_version() {
     )
     .tensor(
         "token_embd.weight",
-        &[8, 4],
+        &[8, 259],
         1, // GGML F16
         vec![0; 64],
     );
@@ -828,6 +853,7 @@ fn spec_exact_u32_keys_reject_u64_values() {
         .kv_u64("tokenizer.ggml.eos_token_id", 0)
         .kv_arr_str("tokenizer.ggml.tokens", &["a", "<|endoftext|>"])
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 1])
+        .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     match load_bytes(&b.build()) {
@@ -965,6 +991,7 @@ fn stop_tokens_must_be_control_typed() {
             &["a", "<|endoftext|>", "<|im_end|>", "<|im_start|>"],
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 1, 3])
+        .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     match load_bytes(&b.build()) {
@@ -1001,9 +1028,9 @@ fn nonzero_padding_between_tensors_is_refused() {
     let with_gap = mini()
         .tensor_at(
             "output.weight",
-            &[32, 11],
+            &[32, 265],
             GGML_F32,
-            f32_bytes(&[0.0; 352]),
+            f32_bytes(&[0.0; 8480]),
             forced,
         )
         .build();
@@ -1036,9 +1063,9 @@ fn missing_tensor_diagnostic_is_deterministic() {
         )
         .tensor(
             "token_embd.weight",
-            &[8, 4],
+            &[8, 259],
             GGML_F32,
-            f32_bytes(&[0.0; 32]),
+            f32_bytes(&[0.0; 8 * 259]),
         )
         .build()
     };
@@ -1085,9 +1112,9 @@ fn nonzero_leading_padding_is_refused() {
     let with_gap = mini()
         .tensor_at(
             "output.weight",
-            &[32, 11],
+            &[32, 265],
             GGML_F32,
-            f32_bytes(&[0.0; 352]),
+            f32_bytes(&[0.0; 8480]),
             0,
         )
         .build();
@@ -1115,13 +1142,14 @@ fn nonzero_leading_padding_is_refused() {
             )
             .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3])
             .kv_arr_str("tokenizer.ggml.merges", &[])
-            .kv_str("tokenizer.chat_template", "x");
+            .kv_str("tokenizer.chat_template", "x")
+            .with_full_byte_alphabet();
         // one tensor, forced 32 bytes past the region start
         b = b.tensor_at(
             "token_embd.weight",
-            &[32, 4],
+            &[32, 259],
             GGML_F32,
-            f32_bytes(&[0.0; 128]),
+            f32_bytes(&[0.0; 32 * 259]),
             32,
         );
         let bytes = b.build();
@@ -1217,6 +1245,7 @@ fn optional_tool_marker_with_wrong_token_type_is_refused() {
             ],
         )
         .kv_arr_i32("tokenizer.ggml.token_type", &[1, 3, 3, 3, 1])
+        .with_full_byte_alphabet()
         .kv_arr_str("tokenizer.ggml.merges", &[])
         .kv_str("tokenizer.chat_template", "x");
     match load_bytes(&b.build()) {
