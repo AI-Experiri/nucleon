@@ -452,12 +452,46 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     }
 
     // Optional template markers the ChatML template may emit under
-    // tools/thinking modes. Each rule: (a) if the compiled template
-    // MENTIONS the marker by name, the vocab must contain it (the
-    // conversion would otherwise BPE-split the marker at render
-    // time); (b) whenever it IS in the vocab, it must be
-    // USER_DEFINED so the tokenizer registers it atomically.
+    // tools/thinking modes. Each rule:
+    // (a) if the marker appears in the source OR is emitted by the
+    //     tools/thinking smoke render, the vocab must contain it
+    //     (BPE would split it otherwise);
+    // (b) whenever it IS in the vocab, it must be USER_DEFINED so
+    //     the tokenizer registers it atomically.
     let template_src = chat_template.source();
+    let user_nonce = "nucleon_smoke_user_9c31f2";
+    // Second smoke render with tools + thinking enabled, bounded the
+    // same way, so a template that emits markers by dynamic string
+    // concatenation cannot hide from a source-only check.
+    let mut tools_smoke = String::new();
+    let _ = chat_template
+        .environment()
+        .get_template("chat")
+        .expect("added at ChatTemplate::new")
+        .render_captured_to(
+            minijinja::context! {
+                messages => vec![
+                    minijinja::context! { role => "user", content => user_nonce },
+                ],
+                tools => vec![minijinja::context! {
+                    r#type => "function",
+                    function => minijinja::context! {
+                        name => "probe",
+                        description => "smoke",
+                        parameters => minijinja::context! {
+                            r#type => "object",
+                            properties => minijinja::context! {},
+                        },
+                    },
+                }],
+                add_generation_prompt => true,
+                enable_thinking => true,
+            },
+            CappedWriter {
+                inner: &mut tools_smoke,
+                cap: 64 * 1024,
+            },
+        );
     for marker in [
         "<tool_call>",
         "</tool_call>",
@@ -467,9 +501,10 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
         "</think>",
     ] {
         let position = tokens.iter().position(|t| t == marker);
-        if template_src.contains(marker) && position.is_none() {
+        let referenced = template_src.contains(marker) || tools_smoke.contains(marker);
+        if referenced && position.is_none() {
             return Err(LoaderError::Structure {
-                reason: format!("chat template mentions \"{marker}\" but the vocab does not"),
+                reason: format!("chat template references \"{marker}\" but the vocab does not"),
             });
         }
         if let Some(pos) = position {
@@ -728,6 +763,35 @@ fn byte_level_char(b: u8) -> char {
         }
     }
     char::from_u32(256 + n).expect("PUA range")
+}
+
+/// A std::io::Write sink that refuses to grow past `cap` bytes.
+/// Used to bound the chat-template smoke render so a hostile
+/// template cannot force unbounded allocation at load time.
+struct CappedWriter<'a> {
+    inner: &'a mut String,
+    cap: usize,
+}
+
+impl std::io::Write for CappedWriter<'_> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        if self.inner.len() + buf.len() > self.cap {
+            return Err(std::io::Error::other(format!(
+                "output exceeded {} bytes",
+                self.cap
+            )));
+        }
+        match std::str::from_utf8(buf) {
+            Ok(s) => {
+                self.inner.push_str(s);
+                Ok(buf.len())
+            }
+            Err(_) => Err(std::io::Error::other("template produced non-UTF-8 bytes")),
+        }
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 fn take_str_array(c: &mut Container, key: &'static str) -> Result<Vec<String>, LoaderError> {
