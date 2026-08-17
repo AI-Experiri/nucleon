@@ -16,6 +16,8 @@
 // is: same names, same signatures. This crate exists so that if
 // mlx-rs breaks compat on a version bump we have exactly one file
 // to update.
+pub use mlx_rs;
+pub use mlx_rs::nn::silu;
 pub use mlx_rs::{fast, ops, Array, Device, Dtype};
 
 /// Build an f32 Array from a Vec<f32> and a row-major shape given

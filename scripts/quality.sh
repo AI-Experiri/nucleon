@@ -35,7 +35,10 @@ cargo clippy --all-targets -- -D warnings || fail "clippy"
 ok "clippy"
 
 step "cargo test --workspace"
-cargo test --workspace || fail "tests"
+# --test-threads=1: family forward tests mutate the process-global
+# default MLX device (CPU, to sidestep Metal's head_dim >= 32 SDPA
+# constraint on the tiny fixture); parallel tests would race.
+cargo test --workspace -- --test-threads=1 || fail "tests"
 ok "tests"
 
 printf "${GREEN}quality gate passed${NC}\n"

@@ -13,5 +13,6 @@
 //! and every block is testable in isolation. See
 //! `docs/book/00-big-picture.md`.
 
+pub mod families;
 pub mod loader;
 pub mod tokenizer;
