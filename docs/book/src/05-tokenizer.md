@@ -207,9 +207,14 @@ But `Yamf`'s fields are public — a hand-built bundle skips the gate
 — so `from_yamf` re-validates its own border and refuses rather
 than build a silently-corrupting tokenizer: parallel tokens/types
 arrays, no duplicate token strings, the full 256-character byte
-alphabet present and Normal-typed, merge operands and products
-Normal-typed, and a pre id it has a regex for. These are not
-redundant with the loader's gate; they are the module's own door.
+alphabet present and Normal-typed, no duplicate merges (the
+crate's merge map silently keeps the LAST occurrence's rank),
+merge operands and products present in the vocab (the crate's
+builder panics on a long absent product — it writes the
+concatenation into a buffer sized to the longest vocab key BEFORE
+checking the product exists) and Normal-typed, and a pre id it has
+a regex for. These are not redundant with the loader's gate; they
+are the module's own door.
 
 The construction uses Hugging Face's `tokenizers` crate
 (default-features off, `fancy-regex` on, per 8.5):

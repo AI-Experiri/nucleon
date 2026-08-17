@@ -3,9 +3,10 @@
 //! Book chapter 8.7: every part is built from a field the loader
 //! already validated — but Yamf's fields are public, so a
 //! hand-built bundle can skip the gate. from_yamf therefore
-//! re-validates its own border (parallel arrays, duplicates, byte
-//! alphabet present and Normal-typed, merge references Normal, pre
-//! id known) and refuses rather than build a silently-corrupting
+//! re-validates its own border (parallel arrays, duplicate tokens
+//! and duplicate merges, byte alphabet present and Normal-typed,
+//! merge operands/products present in the vocab and Normal-typed,
+//! pre id known) and refuses rather than build a silently-corrupting
 //! tokenizer. These checks are the module's own door, not
 //! redundancy. The crate items used here are the table in 8.11.
 
