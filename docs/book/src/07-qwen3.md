@@ -26,17 +26,17 @@ and four of them stack into a block that repeats 28 times. Every
 part below cites the paper it comes from at first mention; here is
 the complete reference set for later, in one place:
 
-| part | paper | year |
+| year | paper | part |
 |---|---|---|
-| the whole block shape | [Attention Is All You Need](https://arxiv.org/abs/1706.03762) | 2017 |
-| the family, as shipped | [Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) | 2025 |
-| tied lm head (9.3) | [Using the Output Embedding to Improve LMs](https://arxiv.org/abs/1608.05859) | 2016 |
-| pre-norm residual (9.4) | [On Layer Normalization in the Transformer Architecture](https://arxiv.org/abs/2002.04745) | 2020 |
-| RMSNorm (9.5) | [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467) | 2019 |
-| SwiGLU (9.6) | [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202) | 2020 |
-| RoPE (9.7) | [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864) | 2021 |
-| GQA (9.8) | [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245) | 2023 |
-| QK-norm (9.8) | [Query-Key Normalization for Transformers](https://arxiv.org/abs/2010.04245) | 2020 |
+| 2016 | [Using the Output Embedding to Improve LMs](https://arxiv.org/abs/1608.05859) | tied lm head (9.3) |
+| 2017 | [Attention Is All You Need](https://arxiv.org/abs/1706.03762) | the whole block shape |
+| 2019 | [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467) | RMSNorm (9.5) |
+| 2020 | [On Layer Normalization in the Transformer Architecture](https://arxiv.org/abs/2002.04745) | pre-norm residual (9.4) |
+| 2020 | [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202) | SwiGLU (9.6) |
+| 2020 | [Query-Key Normalization for Transformers](https://arxiv.org/abs/2010.04245) | QK-norm (9.8) |
+| 2021 | [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864) | RoPE (9.7) |
+| 2023 | [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245) | GQA (9.8) |
+| 2025 | [Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) | the family, as shipped |
 
 The forward pass as a whole:
 
