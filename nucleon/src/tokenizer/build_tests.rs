@@ -93,6 +93,24 @@ fn mismatched_type_array_refuses() {
 }
 
 #[test]
+fn duplicate_token_refuses() {
+    // same public-fields hazard as the short-type-array case: a
+    // duplicate string silently shadows the earlier id in the vocab
+    // map (decodes to "") — refuse instead
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    let first = yamf.tokenizer.tokens[0].clone();
+    yamf.tokenizer.tokens.push(first);
+    yamf.tokenizer
+        .token_types
+        .push(crate::loader::yamf::TokenType::Normal);
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("duplicate token must refuse")
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("distinct"), "{msg}");
+}
+
+#[test]
 fn special_flag_survives_the_crate_registration() {
     // the observable consequence of added_token()'s mapping, pinned
     // through the crate itself: skipping specials eats the Control

@@ -80,6 +80,19 @@ pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
         .enumerate()
         .map(|(i, t)| (t.clone(), i as u32))
         .collect();
+    // same public-fields hazard as the parallel-array check above: a
+    // duplicate token string would silently shadow the earlier id
+    // (it vanishes from the map, decodes to "") and over-report
+    // vocab_size. The loader gates this for real files.
+    if vocab.len() != y.tokenizer.tokens.len() {
+        return Err(TokenizerError::Build {
+            reason: format!(
+                "{} tokens but only {} distinct strings; duplicates shadow ids",
+                y.tokenizer.tokens.len(),
+                vocab.len()
+            ),
+        });
+    }
 
     // part 4, merge side: file order preserved, so index = rank
     let merges: Vec<(String, String)> = y.tokenizer.merges.clone();
