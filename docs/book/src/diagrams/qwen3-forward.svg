@@ -1,4 +1,4 @@
-<svg width="820" height="940" viewBox="0 0 820 940" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+<svg width="700" height="940" viewBox="0 0 700 940" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
   <defs>
     <marker id="arrHead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.85"/>
@@ -27,7 +27,7 @@
   <path d="M 400 118 L 400 176" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
 
   <!-- BLOCK CONTAINER -->
-  <rect x="80" y="182" width="640" height="510" rx="12"
+  <rect x="200" y="182" width="400" height="510" rx="12"
         fill="rgba(139,152,169,0.06)" stroke="#8b98a9" stroke-opacity="0.65" stroke-dasharray="6 4"/>
 
   <text x="400" y="206" text-anchor="middle" font-size="13" fill="#c0cadb">ONE block — SERIAL: attention first, then MLP</text>
@@ -63,7 +63,7 @@
   <text x="400" y="461" text-anchor="middle" font-size="15" fill="#f0c893">+</text>
 
   <!-- residual bypass 1: from x entry down and around LEFT to + -->
-  <path d="M 400 250 L 400 264 L 100 264 L 100 456 L 387 456"
+  <path d="M 400 250 L 400 264 L 240 264 L 240 456 L 387 456"
         fill="none" stroke="#e0a458" stroke-opacity="0.65" stroke-dasharray="4 3" marker-end="url(#arrRes)"/>
 
   <!-- x_mid label after first + -->
@@ -97,7 +97,7 @@
   <text x="400" y="687" text-anchor="middle" font-size="15" fill="#f0c893">+</text>
 
   <!-- residual bypass 2: from x_mid (y=490) around RIGHT of MLP to + at y=682 -->
-  <path d="M 400 490 L 700 490 L 700 682 L 413 682"
+  <path d="M 400 490 L 560 490 L 560 682 L 413 682"
         fill="none" stroke="#e0a458" stroke-opacity="0.65" stroke-dasharray="4 3" marker-end="url(#arrRes)"/>
 
   <!-- T-junction below second + -->
@@ -105,12 +105,12 @@
   <circle cx="400" cy="720" r="3" fill="#c0cadb" opacity="0.9"/>
 
   <!-- LOOP-BACK: right arm out of block, up right side, back into x entry -->
-  <path d="M 400 720 L 760 720 L 760 250 L 418 250"
+  <path d="M 400 720 L 640 720 L 640 250 L 418 250"
         fill="none" stroke="#c0cadb" stroke-opacity="0.65" stroke-dasharray="8 5" marker-end="url(#arrLoop)"/>
 
   <!-- × 28 badge on loop-back right vertical -->
-  <rect x="732" y="474" width="56" height="26" rx="6" fill="rgba(139,152,169,0.25)" stroke="#c0cadb" stroke-opacity="0.75"/>
-  <text x="760" y="492" text-anchor="middle" font-size="12" fill="#c0cadb">× 28</text>
+  <rect x="612" y="474" width="56" height="26" rx="6" fill="rgba(139,152,169,0.25)" stroke="#c0cadb" stroke-opacity="0.75"/>
+  <text x="640" y="492" text-anchor="middle" font-size="12" fill="#c0cadb">× 28</text>
 
   <!-- FORWARD EXIT after 28 iterations: down out of block to final norm -->
   <path d="M 400 720 L 400 762" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
