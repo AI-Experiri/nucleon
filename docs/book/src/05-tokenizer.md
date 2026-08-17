@@ -127,9 +127,12 @@ Two Rust-specific notes:
 
 A **special token** is a vocabulary entry whose string form is a
 marker the model was trained to recognize as structure, not as
-literal text. Qwen3 has three that matter now, four more that show
-up under tools/thinking modes, and a `token_type` on each so the
-tokenizer knows how to treat them:
+literal text. Qwen3 carries 26 of them in total; the seven below
+are the ones this book's chapters use (the other 19 are vision
+markers like `<|vision_start|>`, fill-in-the-middle markers like
+`<|fim_prefix|>`, repo markers, and `<tool_response>` — all
+registered the same way, none needed until their feature lands).
+Each has a `token_type` so the tokenizer knows how to treat it:
 
 | id | string | token_type | what it means |
 |---|---|---|---|
