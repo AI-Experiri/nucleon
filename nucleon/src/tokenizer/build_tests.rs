@@ -144,6 +144,39 @@ fn non_normal_merge_reference_refuses() {
 }
 
 #[test]
+fn long_absent_merge_product_refuses_without_panicking() {
+    // the crate's BpeBuilder writes the concatenated pair into a
+    // buffer sized to the LONGEST vocab key before checking the
+    // product exists — an absent product longer than that key is a
+    // slice-index panic inside the crate. Our border refuses first.
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    let long = "q".repeat(16);
+    yamf.tokenizer.tokens.push(long.clone());
+    yamf.tokenizer
+        .token_types
+        .push(crate::loader::yamf::TokenType::Normal);
+    // parts in vocab, product (32 chars, longer than any key) absent
+    yamf.tokenizer.merges.push((long.clone(), long));
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("absent merge product must refuse")
+    };
+    assert!(err.to_string().contains("not in the vocab"), "{err}");
+}
+
+#[test]
+fn duplicate_merge_refuses() {
+    // a repeated pair silently keeps the LAST rank inside the
+    // crate's merge map — rank corruption with no error
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    let first = yamf.tokenizer.merges[0].clone();
+    yamf.tokenizer.merges.push(first);
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("duplicate merge must refuse")
+    };
+    assert!(err.to_string().contains("duplicate merge"), "{err}");
+}
+
+#[test]
 fn incomplete_byte_alphabet_refuses() {
     // the worst silent-corruption case: with no unk token, a
     // character missing from the vocab is DROPPED at encode and its

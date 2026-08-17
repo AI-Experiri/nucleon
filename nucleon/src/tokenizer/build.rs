@@ -125,22 +125,39 @@ pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
             });
         }
     }
-    // merges get the same treatment: a merge operand or product
-    // typed non-Normal becomes an added token, the piece it names
-    // can never form, and the merge silently never fires
+    // merges get the same treatment. Three refusals per merge:
+    // - a duplicate pair silently keeps the LAST rank inside the
+    //   crate's merge map (rank corruption, wrong ids, no error);
+    // - an operand or product missing from the vocab must refuse
+    //   HERE: the crate's builder sizes a scratch buffer to the
+    //   longest vocab key and writes the concatenation into it
+    //   BEFORE checking the product exists, so a long-enough absent
+    //   product is a slice-index panic, not an Err (reproduced
+    //   against tokenizers 0.23.1, model.rs:264-270);
+    // - an operand or product typed non-Normal becomes an added
+    //   token, the piece it names can never form, and the merge
+    //   silently never fires.
+    let mut merge_seen = std::collections::HashSet::new();
     for (a, b) in &y.tokenizer.merges {
+        if !merge_seen.insert((a.as_str(), b.as_str())) {
+            let shown: String = format!("{a} {b}").chars().take(64).collect();
+            return Err(TokenizerError::Build {
+                reason: format!("duplicate merge \"{shown}\" would silently change its rank"),
+            });
+        }
         let product = format!("{a}{b}");
         for part in [a.as_str(), b.as_str(), product.as_str()] {
-            if let Some(&id) = vocab.get(part) {
-                if y.tokenizer.token_types[id as usize] != TokenType::Normal {
-                    let shown: String = part.chars().take(64).collect();
-                    return Err(TokenizerError::Build {
-                        reason: format!("merge references non-Normal token \"{shown}\""),
-                    });
-                }
+            let shown = || -> String { part.chars().take(64).collect() };
+            let Some(&id) = vocab.get(part) else {
+                return Err(TokenizerError::Build {
+                    reason: format!("merge references token \"{}\" not in the vocab", shown()),
+                });
+            };
+            if y.tokenizer.token_types[id as usize] != TokenType::Normal {
+                return Err(TokenizerError::Build {
+                    reason: format!("merge references non-Normal token \"{}\"", shown()),
+                });
             }
-            // a missing part falls through to the BPE builder's own
-            // merge validation, which refuses it by name
         }
     }
 
