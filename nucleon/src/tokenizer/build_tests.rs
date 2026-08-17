@@ -69,6 +69,43 @@ fn byte_level_regex_stays_off() {
 }
 
 #[test]
+fn merge_rank_is_file_order() {
+    // index = rank is load-bearing: on ".ab" both "a b" (rank 0)
+    // and ". a" (rank 3) are candidates, and the lower rank must
+    // win — "." + "ab" (the "." is alphabet id 61), never ".a" + "b".
+    // A loader refactor that reorders merges (say through a set)
+    // silently changes ids everywhere; this pins the order.
+    assert_eq!(tok().encode(".ab").unwrap(), vec![61, 2]);
+}
+
+#[test]
+fn mismatched_type_array_refuses() {
+    // Yamf's fields are public; a hand-built bundle with a short
+    // token_types must refuse, not silently truncate the added-token
+    // zip and leave trailing specials unregistered
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    yamf.tokenizer.token_types.pop();
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("short token_types must refuse")
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("parallel"), "{msg}");
+}
+
+#[test]
+fn special_flag_survives_the_crate_registration() {
+    // the observable consequence of added_token()'s mapping, pinned
+    // through the crate itself: skipping specials eats the Control
+    // marker but must keep the UserDefined/Unknown ones. Guards
+    // against a tokenizers upgrade forcing special=true on
+    // everything passed to add_special_tokens.
+    let t = tok();
+    assert_eq!(t.inner.decode(&[9], true).unwrap(), "");
+    assert_eq!(t.inner.decode(&[12], true).unwrap(), "<think>");
+    assert_eq!(t.inner.decode(&[14], true).unwrap(), "<unk>");
+}
+
+#[test]
 fn only_control_tokens_are_special() {
     // the reference tokenizer.json: ChatML/eos markers special=true,
     // <think>/<tool_call> added but special=false (so a future

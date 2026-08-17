@@ -59,6 +59,19 @@ fn added_token(content: &str, ty: TokenType) -> AddedToken {
 
 /// Build the tokenizer from the loader's border bundle.
 pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
+    // the loader gates this for real files, but Yamf's fields are
+    // public: a hand-built bundle with a short token_types would
+    // otherwise silently truncate the added-token zip below and
+    // leave trailing specials unregistered (BPE-decomposed markers)
+    if y.tokenizer.tokens.len() != y.tokenizer.token_types.len() {
+        return Err(TokenizerError::Build {
+            reason: format!(
+                "{} tokens but {} token_types; the arrays must be parallel",
+                y.tokenizer.tokens.len(),
+                y.tokenizer.token_types.len()
+            ),
+        });
+    }
     // part 4, vocab side: a token's id is its index in the list
     let vocab: Vocab = y
         .tokenizer
