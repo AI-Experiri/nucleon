@@ -13,13 +13,32 @@ Everything below is the qwen3 architecture as
 [modeling_qwen3.py](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3/modeling_qwen3.py)
 defines it (the modeling code outranks papers — [Reading the
 Model](03-reading-the-model.md), 6.3), sized by the config numbers
-the loader read. Implement the family once and every checkpoint
-size runs on config numbers alone.
+the loader read. The family paper is the
+[Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) — the
+sizes we support, the training story, and the differences from
+Qwen2. Implement the family once and every checkpoint size runs on
+config numbers alone.
 
 ## 9.1 The parts
 
 Six parts. One runs once at the start, one runs once at the end,
-and four of them stack into a block that repeats 28 times:
+and four of them stack into a block that repeats 28 times. Every
+part below cites the paper it comes from at first mention; here is
+the complete reference set for later, in one place:
+
+| part | paper | year |
+|---|---|---|
+| the whole block shape | [Attention Is All You Need](https://arxiv.org/abs/1706.03762) | 2017 |
+| the family, as shipped | [Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) | 2025 |
+| tied lm head (9.3) | [Using the Output Embedding to Improve LMs](https://arxiv.org/abs/1608.05859) | 2016 |
+| pre-norm residual (9.4) | [On Layer Normalization in the Transformer Architecture](https://arxiv.org/abs/2002.04745) | 2020 |
+| RMSNorm (9.5) | [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467) | 2019 |
+| SwiGLU (9.6) | [GLU Variants Improve Transformer](https://arxiv.org/abs/2002.05202) | 2020 |
+| RoPE (9.7) | [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864) | 2021 |
+| GQA (9.8) | [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/abs/2305.13245) | 2023 |
+| QK-norm (9.8) | [Query-Key Normalization for Transformers](https://arxiv.org/abs/2010.04245) | 2020 |
+
+The forward pass as a whole:
 
 <div class="diagram"><img src="diagrams/qwen3-forward.svg" alt="ids through embedding, 28 transformer blocks of attention and MLP with residuals, final norm, tied lm head, logits"></div>
 
@@ -88,18 +107,23 @@ sequence of `seq` ids becomes a `[seq, 1024]` array. No math.
 `[seq, 1024]` state back into `[seq, 151936]` logits — a score per
 vocab entry. That is a matmul against a `[1024, 151936]` matrix.
 Qwen3-0.6B does not ship a separate one: it reuses the embedding
-table, transposed. This is called **tying** the head, and it is
-why the loader's tensor contract marks `output.weight` optional —
-absent here, present in the untied larger sizes. One 151936 × 1024
-table instead of two saves 156M parameters, a quarter of this
-model.
+table, transposed. This is called **tying** the head, from Press &
+Wolf, [Using the Output Embedding to Improve Language
+Models](https://arxiv.org/abs/1608.05859) (2016) — it is why the
+loader's tensor contract marks `output.weight` optional (absent
+here, present in the untied larger sizes). One 151936 × 1024 table
+instead of two saves 156M parameters, a quarter of this model.
 
 ## 9.4 The residual stream
 
 The wiring rule that makes 28 blocks trainable: a block never
 replaces the `[seq, 1024]` state, it **adds to it**. Each
 sub-block computes a delta from a normalized copy and adds that
-delta back:
+delta back. The normalize-then-sub-block order is **pre-norm**,
+argued for over the original post-norm in Xiong et al.,
+[On Layer Normalization in the Transformer
+Architecture](https://arxiv.org/abs/2002.04745) (2020) — every
+modern LLM uses it because it trains at depth without warmup:
 
 ```text
 x = x + attention(norm(x))     # sub-block 1
@@ -118,8 +142,12 @@ consequences worth keeping in mind while reading the rest:
 
 Before each sub-block, the copy of the stream is rescaled to a
 standard size so the math downstream sees inputs in a predictable
-range. RMSNorm divides each 1024-wide row by its root-mean-square
-and multiplies by a learned per-channel weight:
+range. RMSNorm — Zhang & Sennrich,
+[Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467)
+(2019) — is the trimmed LayerNorm that dropped the mean-centering
+step: as fast as it looks, and empirically as good as the full
+version on transformer training. Divide each 1024-wide row by its
+root-mean-square and multiply by a learned per-channel weight:
 
 ```text
 rms(x)  = sqrt(mean(x^2) + eps)          eps = 1e-6, from the config
@@ -135,7 +163,10 @@ trained-with constant like everything else.
 ## 9.6 The SwiGLU MLP
 
 The second sub-block is where most of the parameters live: three
-matmuls and one gate.
+matmuls and one gate. SwiGLU is one of the gated variants Shazeer
+compared in [GLU Variants Improve
+Transformer](https://arxiv.org/abs/2002.05202) (2020), and the
+winner every serious LLM has shipped since:
 
 ```text
 gate = silu( x @ ffn_gate^T )      [seq, 1024] -> [seq, 3072]
@@ -154,15 +185,19 @@ matrices here instead of the two a plain MLP would have.
 
 Attention (next section) compares positions pairwise, but a matmul
 has no idea *where* in the sequence a value came from. RoPE
-(rotary position embedding) injects position by rotating each
-query and key vector by an angle proportional to its position —
-position 5 is rotated more than position 2, and the score between
-them ends up depending on the *distance* 5−2 rather than the
-absolute positions. The mechanics — pairs of channels as 2D
-coordinates, one frequency per pair, why the base stretches the
-usable context — are taught interactively in the
+(rotary position embedding), from Su et al.,
+[RoFormer: Enhanced Transformer with Rotary Position
+Embedding](https://arxiv.org/abs/2104.09864) (2021), injects
+position by rotating each query and key vector by an angle
+proportional to its position — position 5 is rotated more than
+position 2, and the score between them ends up depending on the
+*distance* 5−2 rather than the absolute positions. The mechanics —
+pairs of channels as 2D coordinates, one frequency per pair, why
+the base stretches the usable context — are taught interactively
+in the
 [LLM Lab positional-encoding chapter](https://llm-lab.bicepjai.com/llm-pos-enc/);
-this book only pins what our family uses:
+the paper has the derivation, this book only pins what our family
+uses:
 
 | RoPE parameter | Qwen3-0.6B value |
 |---|---|
@@ -173,39 +208,45 @@ this book only pins what our family uses:
 
 ## 9.8 Attention, with Qwen3's two signatures
 
-The part everything else exists to feed. For each position, build
-a **query** ("what am I looking for"), and for every position up
-to and including it, a **key** ("what do I contain") and a
-**value** ("what do I contribute"). Scores are query·key dot
-products; a **softmax** turns each row of scores into weights that
-sum to 1 (bigger scores get exponentially more weight); the output
-is the weighted sum of values. Positions after the current one are
-excluded — the **causal mask** — because the model may not read
-the future it is trying to predict.
+The part everything else exists to feed, in the shape Vaswani et
+al. introduced in
+[Attention Is All You Need](https://arxiv.org/abs/1706.03762)
+(2017). For each position, build a **query** ("what am I looking
+for"), and for every position up to and including it, a **key**
+("what do I contain") and a **value** ("what do I contribute").
+Scores are query·key dot products; a **softmax** turns each row of
+scores into weights that sum to 1 (bigger scores get exponentially
+more weight); the output is the weighted sum of values. Positions
+after the current one are excluded — the **causal mask** — because
+the model may not read the future it is trying to predict.
 
 <div class="diagram"><img src="diagrams/qwen3-attention.svg" alt="x projected to Q, K, V; per-head QK-norm; RoPE; grouped-query SDPA with causal mask; output projection"></div>
 
 The two things that make this *Qwen3's* attention and not the
 textbook version:
 
-**Grouped-query attention (GQA).** 16 query heads but only 8
-key/value heads: each KV head serves two query heads. The two
-query heads in a group look for different things in the same
+**Grouped-query attention (GQA)** — Ainslie et al.,
+[GQA](https://arxiv.org/abs/2305.13245) (2023). 16 query heads but
+only 8 key/value heads: each KV head serves two query heads. The
+two query heads in a group look for different things in the same
 memory. Why: at generation time K and V are what the cache chapter
 will keep around per past position, and halving the KV heads
 halves that cache — the quality cost of sharing is small, the
 memory saving is not.
 
-**QK-norm.** After splitting into heads and before RoPE, each
-128-wide query head and key head is RMSNormed with its own tiny
-weight (`attn_q_norm`, `attn_k_norm` — the two `[128]` tensors in
-every block). All 16 query heads share the one q_norm weight; all
-8 KV heads share the one k_norm weight. This is Qwen3's addition
-over Qwen2 (which normed nothing inside attention): it keeps
-query·key dot products in a bounded range so softmax never
-saturates, which is what lets the family train stably at large
-sizes. Skip it and the weights still fit — and the output is
-garbage, the same silent failure class as the head_dim landmine.
+**QK-norm** — Henry et al.,
+[Query-Key Normalization for
+Transformers](https://arxiv.org/abs/2010.04245) (2020). After
+splitting into heads and before RoPE, each 128-wide query head and
+key head is RMSNormed with its own tiny weight (`attn_q_norm`,
+`attn_k_norm` — the two `[128]` tensors in every block). All 16
+query heads share the one q_norm weight; all 8 KV heads share the
+one k_norm weight. This is Qwen3's addition over Qwen2 (which
+normed nothing inside attention): it keeps query·key dot products
+in a bounded range so softmax never saturates, which is what lets
+the family train stably at large sizes. Skip it and the weights
+still fit — and the output is garbage, the same silent failure
+class as the head_dim landmine.
 
 The full sub-block, shapes annotated:
 
