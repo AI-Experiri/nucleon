@@ -18,7 +18,7 @@
 // to update.
 pub use mlx_rs;
 pub use mlx_rs::nn::silu;
-pub use mlx_rs::{fast, ops, Array, Device, Dtype};
+pub use mlx_rs::{fast, ops, Array, Device};
 
 /// Build an f32 Array from a Vec<f32> and a row-major shape given
 /// as usize (nucleon-natural). mlx-rs's `Array::from_slice` wants
