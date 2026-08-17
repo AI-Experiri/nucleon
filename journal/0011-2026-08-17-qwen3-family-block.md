@@ -98,25 +98,87 @@ watch named test fail, restore).
   closure so errors report "layer N: <mlx string>". No
   correctness defect. **Stable round 3.**
 
-## CONVERGED
+## Initial "converged" call was wrong
 
-Rounds 4, 5, 6 all found no real bugs — doc/comment/diagnostic
-items only. Per CLAUDE.md's convergence rule (3 consecutive
-stable rounds, only already-assessed items or non-bugs), the
-block is converged.
+I declared convergence after r4/r5/r6 on a lax reading (doc-only
+and cleanup items counted as "stable"). User pushed back:
+"converged?" Under a strict reading of CLAUDE.md — "clean OR only
+already-assessed items" — r4 and r6 both had new items applied
+and don't qualify. Correct reset. Continued to r7+.
 
-## Final state
+## Rounds 7-12 (strict-convergence pass)
 
-- 13 tests passing (11 family + 2 nucleon-mlx)
+- **r7** — cc-qwen: CLEAN (functional); 1 Nit (Unicode arrow in
+  `version_triple()` display string). Sonnet REJECTED (writing-style
+  rule scoped to prose only, not code display strings).
+  **Strict stable 1/3.**
+- **r8** — cc-qwen: CLEAN. Sonnet sanity-check on the CLEAN
+  verdict came back CONFIRMED CLEAN (noted only a cross-file
+  assumption already enforced at loader gate).
+  **Strict stable 2/3.**
+- **r9** — cc-qwen: CLEAN. Sonnet's cold-read sanity check found a
+  **HIGH bug that survived 8 previous rounds**: MLX's `fast::rope`
+  flattens leading dims and treats axis 1 as sequence
+  (`fast.cpp:401,407`). Old code passed RoPE input as
+  `[seq, n_heads, head_dim]` — MLX rotated the n_heads axis as if
+  it were positions. Every seq position got the same rotation;
+  every head got a meaningless "position" rotation. Silent wrong
+  logits through the whole forward pass. Fixed by transposing
+  Q/K/V to `[1, H, seq, D]` BEFORE QK-norm and RoPE (matches
+  HF `modeling_qwen3.py` order). Revert-proof test
+  `rope_actually_rotates_along_seq_axis` compares logits at two
+  rope_theta values — under the bug they are byte-identical (rope
+  effect is position-independent so consumes zero downstream);
+  under the fix they differ. **Strict stable RESET to 0.**
+- **r10** — cc-qwen: CLEAN. Verified the r9 fix against HF's
+  reshape→transpose(1,2)→q_norm→rope order, QK-norm on
+  `[1,H,seq,D]`, SDPA layout, batch-1 drop, rope args. Sonnet
+  sanity-check CONFIRMED CLEAN. **Strict stable 1/3.**
+- **r11** — cc-qwen: CLEAN. Traced projection layout (GGUF ne
+  reversal), layer_err closure lifetime, refutable-pattern
+  question (single-variant enum, irrefutable), row_major_offset
+  glue. Sonnet CONFIRMED CLEAN with one non-defect note about
+  a comment "matches HF order" being numerically identical but
+  minutely reordered (q_norm before vs after transpose — same
+  result on last-axis RMSNorm). **Strict stable 2/3.**
+- **r12** — cc-qwen: 1 finding (`Qwen3` is `Send + !Sync` because
+  `Array` is `!Sync`). Sonnet WEAKENED: the module doc at
+  `mod.rs:7` already says "no threading", so the constraint is
+  already documented. No action. **Strict stable 3/3.**
+
+## CONVERGED (strict)
+
+Rounds 10, 11, 12 all had zero new items applied — three
+consecutive strict-stable rounds. Per CLAUDE.md's convergence rule
+under strict reading, the block is converged.
+
+The r9 HIGH bug is the block's most important lesson: EIGHT rounds
+of "clean" review missed a fundamental math error because the
+fixture's uniform attn_v weights make V position-invariant, which
+hides RoPE effects on the final logits. Only Sonnet's cold-read
+sanity check (invited exactly because we no longer trusted the
+"CLEAN" verdicts to see subtle things after many rounds) caught
+it — by checking MLX C++ source directly for the axis convention.
+The value-correctness gap warning at forward_tests.rs:94 was not
+merely academic; it flagged a real class of bug that later
+manifested. The loop chapter's HF-oracle golden test is now doubly
+important: it is the only defense against this class of silent
+wrong-logits bug we cannot unit-test.
+
+## Final state (post-r12)
+
+- 14 tests passing (12 family + 2 nucleon-mlx), including the
+  new `rope_actually_rotates_along_seq_axis` revert-proof test
 - Quality gate green
-- All 6 rounds of code fixes revert-proof-verified
+- All code fixes across 12 rounds revert-proof-verified
 - Known coverage gap: value correctness of the forward pass
   (RoPE actually rotating with correct theta, QK-norm ordering,
   attn scale, GQA broadcast, tied-head matmul) is NOT asserted
   by this module's unit tests. The book explicitly acknowledges
-  this ("no fixture can tell correct attention from subtly-
-  wrong attention") and defers to the loop chapter's HF-oracle
-  golden test.
+  this and defers to the loop chapter's HF-oracle golden test.
+  The r9 discovery **empirically confirms** this gap catches
+  real bugs — eight of our review rounds missed one hiding
+  behind the fixture math.
 
 ## Follow-ups (out of this block)
 
