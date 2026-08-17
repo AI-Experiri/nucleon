@@ -36,9 +36,7 @@
   <!-- x entry -->
   <circle cx="400" cy="250" r="4" fill="#e0a458" opacity="0.95"/>
 
-  <!-- ATTENTION SUB-BLOCK (parts 2 + 3) -->
-  <text x="400" y="272" text-anchor="middle" font-size="12" fill="#9dc49d">attention sub-block (parts 2 + 3)</text>
-
+  <!-- ATTENTION SUB-BLOCK (parts 2 + 3) — arrow only, no label (boxes are self-labeling) -->
   <path d="M 400 250 L 400 284" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
 
   <!-- attn RMSNorm -->
@@ -66,14 +64,9 @@
   <path d="M 400 250 L 400 264 L 240 264 L 240 456 L 387 456"
         fill="none" stroke="#e0a458" stroke-opacity="0.65" stroke-dasharray="4 3" marker-end="url(#arrRes)"/>
 
-  <!-- x_mid label after first + -->
-  <path d="M 400 469 L 400 490" fill="none" stroke="#8b98a9" stroke-opacity="0.7"/>
-  <text x="520" y="482" text-anchor="middle" font-size="11" fill="#8b98a9" opacity="0.85">x_mid = x + attention(RMSNorm(x))</text>
-
-  <!-- MLP SUB-BLOCK (parts 2 + 4) -->
-  <text x="400" y="508" text-anchor="middle" font-size="12" fill="#9dc49d">MLP sub-block (parts 2 + 4)</text>
-
-  <path d="M 400 490 L 400 520" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
+  <!-- arrow from + down to MLP norm; tiny x_mid label off-spine so it doesn't cross the arrow -->
+  <path d="M 400 469 L 400 520" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
+  <text x="440" y="493" font-size="11" fill="#8b98a9" opacity="0.85">x_mid</text>
 
   <!-- ffn RMSNorm -->
   <rect x="320" y="524" width="160" height="48" rx="8"
