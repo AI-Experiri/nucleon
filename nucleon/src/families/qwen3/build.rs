@@ -1,11 +1,13 @@
-//! `from_yamf` — move the loader's Yamf tensors into the family's
+//! `from_yamf` — pull the loader's Yamf tensors into the family's
 //! named struct fields, and validate the shapes at this border.
 //!
 //! Book 9.11: the HashMap lookup happens once at build, never
-//! during generation. Yamf's fields are public, so a hand-built
-//! bundle can skip the loader gate; from_yamf's own checks are
-//! the module's door — presence, shape (per-tensor against the
-//! config's derived dims), and no leftover tensors.
+//! during generation. The tensors are refcounted `Array`s, so this
+//! clones handles (cheap) and drains its local copy — the source
+//! `Yamf` is left intact. Yamf's fields are public, so a hand-built
+//! bundle can skip the loader gate; from_yamf's own checks are the
+//! module's door — presence, shape (per-tensor against the config's
+//! derived dims), and no leftover tensors.
 
 use nucleon_mlx::{shape_usize, Array};
 

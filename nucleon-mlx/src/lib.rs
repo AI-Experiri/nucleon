@@ -6,9 +6,13 @@
 //! one file to update. Book chapter 3 (MLX) tells the story; this is
 //! the code side of it.
 //!
-//! Today the wrapper only re-exports what the rest of nucleon needs
-//! and exposes the pinned-version-triple as runtime calls. As the
-//! Qwen3 family lands, the actual op wrappers move here too.
+//! The wrapper re-exports what nucleon needs (`fast`, `ops`, `Array`,
+//! `Device`, `silu`, and the whole `mlx_rs` crate for types like
+//! `ScaledDotProductAttentionMask`), plus a handful of shape helpers
+//! and the pinned-version-triple as runtime calls. The Qwen3 family
+//! reaches through these re-exports directly rather than through
+//! per-op wrapper functions — the wrapping principle (one place to
+//! update when mlx-rs breaks) is served by the re-exports themselves.
 
 // Re-exports of the mlx-rs surface the rest of nucleon uses. Names
 // mirror mlx-rs / mlx-c directly (Array not Tensor, ops::* under
