@@ -1,7 +1,8 @@
 //! nucleon — an LLM inference engine.
 //!
 //! Modules exist only once their chapter is built. So far: [`loader`]
-//! (the gate: GGUF in, Yamf out). Coming per docs/plan.md: tokenizer,
+//! (the gate: GGUF in, Yamf out) and [`tokenizer`] (text to ids and
+//! back, glue over the HF tokenizers crate). Coming per docs/plan.md:
 //! cache, families, sampler, generate, chat.
 //!
 //! Compute lives in the `nucleon-mlx` sibling crate (thin wrapper
@@ -13,3 +14,4 @@
 //! `docs/book/00-big-picture.md`.
 
 pub mod loader;
+pub mod tokenizer;

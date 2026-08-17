@@ -10,6 +10,7 @@ half.workspace = true
 minijinja.workspace = true
 minijinja-contrib.workspace = true
 nucleon-mlx = { path = "../nucleon-mlx" }
+tokenizers.workspace = true
 
 [[bin]]
 name = "nucleon"

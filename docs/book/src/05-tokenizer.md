@@ -218,17 +218,22 @@ The construction uses Hugging Face's `tokenizers` crate
 | `tokens` again | 3. alphabet + 5. decoder | `ByteLevel` pre-tokenizer stage and `ByteLevel` decoder |
 | `stop_token_ids` | 7. stop set | stored on our wrapper, untouched |
 
-In HF-crate terms the assembled object has three layers plus the
+In HF-crate terms the assembled object has four layers plus the
 added tokens:
 
-1. **Pre-tokenizer** — two stages, chained: `Split` with the qwen2
+1. **Normalizer** — `NFC`. The reference tokenizer.json carries it,
+   but GGUF has no field for a normalizer, so `from_yamf` pins it
+   the same way it pins the regex. Without it, decomposed Unicode
+   input (an `e` followed by a combining acute — routine on macOS)
+   tokenizes to ids the model never saw in training.
+2. **Pre-tokenizer** — two stages, chained: `Split` with the qwen2
    regex, then `ByteLevel` with `add_prefix_space=false`,
    `trim_offsets=false`, `use_regex=false` (the regex already ran
    in Split).
-2. **Model** — `BPE` from `(vocab, merges)`. No unk token, no
+3. **Model** — `BPE` from `(vocab, merges)`. No unk token, no
    byte-fallback, no ignore-merges: the byte-level alphabet gives
    every input a path.
-3. **Decoder** — `ByteLevel` with the same flags, the inverse
+4. **Decoder** — `ByteLevel` with the same flags, the inverse
    mapping back to bytes.
 
 Part 6 (UTF-8 buffering) is not built here — it is a per-generation
@@ -325,6 +330,7 @@ these seven rows executed top to bottom.
 | 5 | decoder | `decoders::byte_level::ByteLevel` | the same ByteLevel type in its decoder role, attached via `with_decoder` |
 | 6 | UTF-8 buffering | `DecodeStream` | `decode_stream(false)` on the built tokenizer; `step(id)` returns `Ok(None)` while buffering, `Ok(Some(chunk))` on a complete codepoint |
 | 7 | stop set | — | no crate concept; a `Vec<u32>` field on our wrapper, returned by `stop_token_ids()` |
+| — | NFC normalization | `normalizers::unicode::NFC` | pinned in `from_yamf` (GGUF has no normalizer field; the reference tokenizer.json requires it), attached via `with_normalizer` before the added tokens |
 
 The two runtime paths in crate terms:
 

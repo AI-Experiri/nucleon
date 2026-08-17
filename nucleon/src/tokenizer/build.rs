@@ -1,0 +1,158 @@
+//! `from_yamf` — Yamf pieces to an in-memory HF tokenizer.
+//!
+//! Book chapter 8.7: every part is built from a field the loader
+//! already validated, so this file trusts its inputs completely.
+//! The crate items used here are the table in chapter 8.11.
+
+use tokenizers::models::bpe::{BpeBuilder, Vocab};
+use tokenizers::normalizers::unicode::NFC;
+use tokenizers::pre_tokenizers::byte_level::ByteLevel;
+use tokenizers::pre_tokenizers::sequence::Sequence;
+use tokenizers::pre_tokenizers::split::{Split, SplitPattern};
+use tokenizers::{AddedToken, SplitDelimiterBehavior};
+
+use crate::loader::yamf::{TokenType, Yamf};
+use crate::tokenizer::error::TokenizerError;
+
+/// The qwen2 pre-tokenizer regex, verified against Qwen's
+/// tokenizer.json and llama.cpp's LLAMA_VOCAB_PRE_TYPE_QWEN2
+/// (docs/research/gguf-qwen3.md section 7; book 8.5 explains each
+/// alternative).
+const QWEN2_PRE: &str = r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+";
+
+/// The tokenizer: parts 1-5 live inside the wrapped HF tokenizer,
+/// part 7 (the stop set) is our field, part 6 (UTF-8 buffering) is
+/// created per generation by `stream_decoder`.
+pub struct Tokenizer {
+    pub(super) inner: tokenizers::Tokenizer,
+    pub(super) stops: Vec<u32>,
+    /// `tokens.len()` at build time. Stored because the crate's
+    /// `get_vocab_size` clones the whole vocab per call, and added
+    /// tokens reuse vocab ids so the count never differs.
+    vocab_len: usize,
+}
+
+impl Tokenizer {
+    /// Part 7 verbatim: the stop ids the loader assembled.
+    /// Comparing against them is the generation loop's job.
+    pub fn stop_token_ids(&self) -> &[u32] {
+        &self.stops
+    }
+
+    /// Vocab size including added tokens.
+    pub fn vocab_size(&self) -> usize {
+        self.vocab_len
+    }
+}
+
+/// How one vocab entry becomes an added token. Split out so the
+/// field choices are directly testable: only Control is special AS
+/// GGUF TYPES IT (<think>/<tool_call> arrive UserDefined and stay
+/// non-special, matching the reference; the fim/repo markers arrive
+/// Control because llama.cpp's converter types any <|...|> shape as
+/// control, so they diverge from the reference's special=false —
+/// inert while every decode path keeps specials). normalized stays
+/// false for both kinds, as in the reference.
+fn added_token(content: &str, ty: TokenType) -> AddedToken {
+    AddedToken::from(content.to_string(), matches!(ty, TokenType::Control)).normalized(false)
+}
+
+/// Build the tokenizer from the loader's border bundle.
+pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
+    // part 4, vocab side: a token's id is its index in the list
+    let vocab: Vocab = y
+        .tokenizer
+        .tokens
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.clone(), i as u32))
+        .collect();
+
+    // part 4, merge side: file order preserved, so index = rank
+    let merges: Vec<(String, String)> = y.tokenizer.merges.clone();
+
+    let bpe = BpeBuilder::default()
+        .vocab_and_merges(vocab, merges)
+        .build()
+        .map_err(TokenizerError::build)?;
+    let mut inner = tokenizers::Tokenizer::new(bpe);
+
+    // Qwen3's reference tokenizer.json carries an NFC normalizer.
+    // GGUF has no field for it, so it is pinned here like the regex:
+    // without it, decomposed input (an e + combining acute, routine
+    // on macOS) tokenizes to ids the model never saw in training.
+    // Set before add_special_tokens below per the crate's guidance;
+    // the ordering only bites for normalized(true) added tokens,
+    // which added_token() never produces.
+    inner
+        .with_normalizer(Some(NFC))
+        .map_err(TokenizerError::build)?;
+
+    // part 2 then part 3, chained: the pre id selects the regex (the
+    // loader gates the value, but the match here keeps this file
+    // honest the day a second family's pre is accepted — a regex
+    // nothing selects is a silent wrong-ids bug), then the
+    // byte-level stage maps bytes to alphabet characters. ByteLevel's
+    // own regex stays off — Split already ran.
+    let pre_regex = match y.tokenizer.pre.as_str() {
+        "qwen2" => QWEN2_PRE,
+        other => {
+            return Err(TokenizerError::Build {
+                reason: format!("pre-tokenizer id \"{other}\"; this build supports: qwen2"),
+            })
+        }
+    };
+    let split = Split::new(
+        SplitPattern::Regex(pre_regex.to_string()),
+        SplitDelimiterBehavior::Isolated,
+        false,
+    )
+    .map_err(TokenizerError::build)?;
+    let byte_level = ByteLevel::new(
+        false, // add_prefix_space: the chat template owns the string
+        false, // trim_offsets: offsets unused, keep them honest
+        false, // use_regex: Split above already did the splitting
+    );
+    inner.with_pre_tokenizer(Some(Sequence::new(vec![split.into(), byte_level.into()])));
+
+    // part 5: the same ByteLevel type in its decoder role
+    inner.with_decoder(Some(byte_level));
+
+    // part 1: every Control/UserDefined entry becomes an added
+    // token, matched whole before BPE ever sees the text. They are
+    // already in the vocab, so registration reuses their ids. Only
+    // Control entries are marked special (matching the reference
+    // tokenizer.json, where <think>/<tool_call> are added but NOT
+    // special — skip_special_tokens must never eat them); normalized
+    // stays false for both kinds, as in the reference.
+    let added: Vec<AddedToken> = y
+        .tokenizer
+        .tokens
+        .iter()
+        .zip(&y.tokenizer.token_types)
+        .filter(|(_, ty)| {
+            // llama.cpp's special-token cache is CONTROL | USER_DEFINED
+            // | UNKNOWN (research doc section 7); Qwen3 has no Unknown
+            // rows, but a vocab that carries an <unk> must match it
+            // whole, not BPE-decompose it
+            matches!(
+                ty,
+                TokenType::Control | TokenType::UserDefined | TokenType::Unknown
+            )
+        })
+        .map(|(t, ty)| added_token(t, *ty))
+        .collect();
+    inner
+        .add_special_tokens(added)
+        .map_err(TokenizerError::build)?;
+
+    Ok(Tokenizer {
+        inner,
+        stops: y.tokenizer.stop_token_ids.clone(),
+        vocab_len: y.tokenizer.tokens.len(),
+    })
+}
+
+#[cfg(test)]
+#[path = "build_tests.rs"]
+mod tests;

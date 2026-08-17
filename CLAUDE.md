@@ -120,14 +120,17 @@ watching it happen. Therefore:
   (what it does, why it exists, how to read it).
 - Milestones get git tags (`m1-cpu-hello`, `m2-metal-parity`, …).
 
-## Codex review convergence (required before any change is "done")
+## Review convergence (required before any change is "done")
 
 Same protocol as higgs — the canonical rules live in
 `higgs/CLAUDE.md`; summary:
 
-1. Review every non-trivial change with `codex` in a loop
-   (`codex exec --skip-git-repo-check '<scoped prompt>'` for prompted reviews;
-   model per user preference: `-m gpt-5.5 -c model_reasoning_effort="xhigh"`).
+1. Review every non-trivial change with INDEPENDENT review agents
+   in a loop (user policy). Two reviewer kinds, either or mixed:
+   - `codex exec --skip-git-repo-check '<scoped prompt>'`
+     (`-m gpt-5.5 -c model_reasoning_effort="xhigh"`);
+   - Claude Opus subagents (Agent tool, model opus), each round a
+     FRESH agent with no prior conclusions preloaded.
 2. **Validate every finding yourself by reading the code.** Fix real ones;
    dismiss false positives with a one-line file:line evidence note.
 3. **Converged = 3 consecutive stable rounds** (clean, or only
@@ -164,8 +167,10 @@ Same protocol as higgs — the canonical rules live in
 
 Before calling any change done: `./scripts/quality.sh`
 (fmt apply+verify → clippy --all-targets -D warnings → test --workspace).
-Coverage gates (llvm-cov, thresholds TBD as the project matures) follow the
-higgs model: unit gate measures production lines only.
+Coverage gates (llvm-cov, user policy): unit tests >= 90%, integration
+tests >= 85%, following the higgs model — the unit gate measures
+production lines only. Integration coverage applies once `tests/`
+end-to-end tests exist (the loop chapter's golden test onward).
 
 ## Workflow rules (from jigglebot, they apply here too)
 

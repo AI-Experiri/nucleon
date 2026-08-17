@@ -1,170 +1,17 @@
 use super::*;
 
-/// Minimal valid ChatML template that satisfies the load-time render
-/// smoke test. Tests only care that ChatML shape emits; the real
-/// Qwen3 template is much richer and gets exercised separately.
-const CHATML_TPL: &str = "{%- for m in messages -%}<|im_start|>{{ m.role }}\n{{ m.content }}<|im_end|>\n{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant\n{%- endif -%}";
 use crate::loader::formats::gguf::builder::{
-    f32_bytes, quantize_q8_0_ref, GgufBuilder, GGML_F32, GGML_Q8_0,
+    f32_bytes, mini, quantize_q8_0_ref, GgufBuilder, CHATML_TPL, GGML_F32, GGML_Q8_0,
 };
-
-// A 1-layer qwen3 mini model: hidden 32, ffn 64, 2 heads / 1 kv
-// head, head_dim 16, vocab 10. Every required tensor present;
-// ffn_gate is the Q8_0 one — its rows are 32 wide because Q8_0
-// blocks never span rows, and the fixture's every block contains
-// -127 so the roundtrip is integer-exact.
-fn mini() -> GgufBuilder {
-    let hidden = 32u64;
-    let ffn = 64u64;
-    let q_rows = 32u64; // 2 heads x head_dim 16
-    let kv_rows = 16u64; // 1 kv head x 16
-                         // a, b, ab, cc, dd, ccdd, tok6, tok7 -> 8 named tokens, of which
-                         // only "a" and "b" fall inside the byte-level alphabet, so the
-                         // extension appends 254 characters. Plus the 3 special tokens.
-    let vocab: u64 = 11 + 254; // 11 named + 254 alphabet (of 256, "a" and "b" overlap)
-
-    let tokens: Vec<String> = ["a", "b", "ab", "cc", "dd", "ccdd", "tok6", "tok7"]
-        .iter()
-        .map(|t| t.to_string())
-        .chain([
-            "<|endoftext|>".to_string(),
-            "<|im_end|>".to_string(),
-            "<|im_start|>".to_string(),
-        ])
-        .collect();
-    let token_refs: Vec<&str> = tokens.iter().map(|s| s.as_str()).collect();
-    // types must match the 11 named tokens: 1 = Normal (mergeable
-    // BPE pieces are always Normal), 3 = Control for the specials
-    // at the end. The builder chains with_full_byte_alphabet()
-    // which appends Normal entries for the missing alphabet
-    // characters.
-    let types: Vec<i32> = vec![1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3];
-
-    // embedding data: value = row * 100 + col, to pin the layout
-    let embd: Vec<f32> = (0..vocab * hidden)
-        .map(|i| ((i / hidden) * 100 + (i % hidden)) as f32)
-        .collect();
-    // ffn_gate: every 32-value block holds -127, so d = 1.0 exactly
-    let gate: Vec<f32> = (0..ffn * hidden)
-        .map(|i| ((i % 32) * 4) as f32 - 127.0)
-        .collect();
-
-    GgufBuilder::new()
-        .kv_str("general.architecture", "qwen3")
-        .kv_u32("general.quantization_version", 2)
-        .kv_u32("qwen3.block_count", 1)
-        .kv_u32("qwen3.embedding_length", hidden as u32)
-        .kv_u32("qwen3.feed_forward_length", ffn as u32)
-        .kv_u32("qwen3.attention.head_count", 2)
-        .kv_u32("qwen3.attention.head_count_kv", 1)
-        .kv_u32("qwen3.attention.key_length", 16)
-        .kv_u32("qwen3.attention.value_length", 16)
-        .kv_f32("qwen3.attention.layer_norm_rms_epsilon", 1e-6)
-        .kv_f32("qwen3.rope.freq_base", 1e6)
-        .kv_u32("qwen3.context_length", 64)
-        .kv_str("tokenizer.ggml.model", "gpt2")
-        .kv_str("tokenizer.ggml.pre", "qwen2")
-        .kv_u32("tokenizer.ggml.eos_token_id", 9)
-        .kv_arr_str("tokenizer.ggml.tokens", &token_refs)
-        .kv_arr_i32("tokenizer.ggml.token_type", &types)
-        .kv_arr_str("tokenizer.ggml.merges", &["a b", "cc dd"])
-        .kv_str(
-            "tokenizer.chat_template",
-            "{%- for m in messages -%}<|im_start|>{{ m.role }}
-{{ m.content }}<|im_end|>
-{%- endfor -%}{%- if add_generation_prompt -%}<|im_start|>assistant
-{%- endif -%}",
-        )
-        .with_full_byte_alphabet()
-        // ne order: dims[0] = row length
-        .tensor(
-            "token_embd.weight",
-            &[hidden, vocab],
-            GGML_F32,
-            f32_bytes(&embd),
-        )
-        .tensor(
-            "output_norm.weight",
-            &[hidden],
-            GGML_F32,
-            f32_bytes(&[1.0; 32]),
-        )
-        .tensor(
-            "blk.0.attn_norm.weight",
-            &[hidden],
-            GGML_F32,
-            f32_bytes(&[1.0; 32]),
-        )
-        .tensor(
-            "blk.0.attn_q.weight",
-            &[hidden, q_rows],
-            GGML_F32,
-            f32_bytes(&[0.5; 1024]),
-        )
-        .tensor(
-            "blk.0.attn_k.weight",
-            &[hidden, kv_rows],
-            GGML_F32,
-            f32_bytes(&[0.5; 512]),
-        )
-        .tensor(
-            "blk.0.attn_v.weight",
-            &[hidden, kv_rows],
-            GGML_F32,
-            f32_bytes(&[0.5; 512]),
-        )
-        .tensor(
-            "blk.0.attn_q_norm.weight",
-            &[16],
-            GGML_F32,
-            f32_bytes(&[1.0; 16]),
-        )
-        .tensor(
-            "blk.0.attn_k_norm.weight",
-            &[16],
-            GGML_F32,
-            f32_bytes(&[1.0; 16]),
-        )
-        .tensor(
-            "blk.0.attn_output.weight",
-            &[q_rows, hidden],
-            GGML_F32,
-            f32_bytes(&[0.5; 1024]),
-        )
-        .tensor(
-            "blk.0.ffn_norm.weight",
-            &[hidden],
-            GGML_F32,
-            f32_bytes(&[1.0; 32]),
-        )
-        .tensor(
-            "blk.0.ffn_gate.weight",
-            &[hidden, ffn],
-            GGML_Q8_0,
-            quantize_q8_0_ref(&gate),
-        )
-        .tensor(
-            "blk.0.ffn_up.weight",
-            &[hidden, ffn],
-            GGML_F32,
-            f32_bytes(&[0.25; 2048]),
-        )
-        .tensor(
-            "blk.0.ffn_down.weight",
-            &[ffn, hidden],
-            GGML_F32,
-            f32_bytes(&[0.25; 2048]),
-        )
-}
 
 #[test]
 fn loads_a_complete_mini_model() {
     let yamf = load_bytes(&mini().build()).unwrap();
     let FamilyConfig::Qwen3(cfg) = &yamf.family;
     assert_eq!(cfg.num_hidden_layers, 1);
-    assert_eq!(cfg.vocab_size, 265);
+    assert_eq!(cfg.vocab_size, 269);
     assert_eq!(yamf.tensors.len(), 13);
-    assert_eq!(yamf.tokenizer.tokens.len(), 11 + 254);
+    assert_eq!(yamf.tokenizer.tokens.len(), 15 + 254);
     assert_eq!(yamf.tokenizer.pre, "qwen2");
     assert_eq!(yamf.tokenizer.merges[0], ("a".to_string(), "b".to_string()));
     // original had a fixed 10-token vocab; the alphabet extension
@@ -187,7 +34,7 @@ fn dims_reverse_into_row_major_and_data_stays_put() {
     let embd = &yamf.tensors["token_embd.weight"];
     // ne [32, 10] becomes ours [10, 32]: 10 vocab rows of 32 values.
     // MLX Array shapes are &[i32]; the literal here infers i32.
-    assert_eq!(embd.shape(), &[265, 32]);
+    assert_eq!(embd.shape(), &[269, 32]);
     // the bytes are NOT moved: row r, col c = r*100 + c
     let embd_data = embd.as_slice::<f32>();
     let s = embd.shape();
@@ -220,8 +67,8 @@ fn tied_file_has_no_output_weight_and_untied_is_accepted() {
     assert!(!yamf.tensors.contains_key("output.weight"));
 
     // an untied size ships output.weight [vocab, hidden] (ne [32, 10])
-    let untied: Vec<f32> = vec![0.0; 8480];
-    let b = mini().tensor("output.weight", &[32, 265], GGML_F32, f32_bytes(&untied));
+    let untied: Vec<f32> = vec![0.0; 8608];
+    let b = mini().tensor("output.weight", &[32, 269], GGML_F32, f32_bytes(&untied));
     let yamf = load_bytes(&b.build()).unwrap();
     assert!(yamf.tensors.contains_key("output.weight"));
 }
@@ -281,15 +128,15 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
     // output.weight with a wrong shape, the cheap misshape probe.
     let b = mini().tensor(
         "output.weight",
-        &[265, 32],
+        &[269, 32],
         GGML_F32,
-        f32_bytes(&[0.0; 8480]),
+        f32_bytes(&[0.0; 8608]),
     );
     match load_bytes(&b.build()) {
         Err(LoaderError::WrongShape { name, want, found }) => {
             assert_eq!(name, "output.weight");
-            assert_eq!(want, vec![265, 32]); // ours: [vocab, hidden]
-            assert_eq!(found, vec![32, 265]); // ne [10, 32] reversed
+            assert_eq!(want, vec![269, 32]); // ours: [vocab, hidden]
+            assert_eq!(found, vec![32, 269]); // ne [10, 32] reversed
         }
         other => panic!("{:?}", other.err()),
     }
@@ -297,7 +144,7 @@ fn missing_and_unexpected_and_misshapen_tensors_are_named() {
 
 #[test]
 fn unsupported_quant_type_is_refused_by_name() {
-    let b = mini().tensor("output.weight", &[32, 265], 2 /* Q4_0 */, vec![0; 180]);
+    let b = mini().tensor("output.weight", &[32, 269], 2 /* Q4_0 */, vec![0; 180]);
     match load_bytes(&b.build()) {
         Err(LoaderError::UnsupportedTensorType { type_id: 2, .. }) => {}
         other => panic!("{:?}", other.err()),
@@ -1091,9 +938,9 @@ fn nonzero_padding_between_tensors_is_refused() {
     let with_gap = mini()
         .tensor_at(
             "output.weight",
-            &[32, 265],
+            &[32, 269],
             GGML_F32,
-            f32_bytes(&[0.0; 8480]),
+            f32_bytes(&[0.0; 8608]),
             forced,
         )
         .build();
@@ -1175,9 +1022,9 @@ fn nonzero_leading_padding_is_refused() {
     let with_gap = mini()
         .tensor_at(
             "output.weight",
-            &[32, 265],
+            &[32, 269],
             GGML_F32,
-            f32_bytes(&[0.0; 8480]),
+            f32_bytes(&[0.0; 8608]),
             0,
         )
         .build();
