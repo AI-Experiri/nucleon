@@ -98,16 +98,44 @@ pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
     // encode and its neighbors merge across the hole ("acb" with no
     // "c" encodes like "ab"). The byte-level alphabet is what makes
     // every input encodable; verify all 256 entries at this border,
-    // not just in the GGUF gate.
+    // not just in the GGUF gate. Presence is not enough: an alphabet
+    // entry typed non-Normal would flow into the added-token filter
+    // below and match whole ahead of BPE, corrupting every word
+    // containing that byte.
     for b in 0..=255u8 {
         let ch = crate::loader::yamf::byte_level_char(b);
         let s: String = std::iter::once(ch).collect();
-        if !vocab.contains_key(&s) {
+        let Some(&id) = vocab.get(&s) else {
             return Err(TokenizerError::Build {
                 reason: format!(
                     "byte-level alphabet incomplete: byte 0x{b:02X} (char {ch:?}) has no vocab entry"
                 ),
             });
+        };
+        if y.tokenizer.token_types[id as usize] != TokenType::Normal {
+            return Err(TokenizerError::Build {
+                reason: format!(
+                    "byte-level alphabet entry for byte 0x{b:02X} (char {ch:?}) is not Normal-typed"
+                ),
+            });
+        }
+    }
+    // merges get the same treatment: a merge operand or product
+    // typed non-Normal becomes an added token, the piece it names
+    // can never form, and the merge silently never fires
+    for (a, b) in &y.tokenizer.merges {
+        let product = format!("{a}{b}");
+        for part in [a.as_str(), b.as_str(), product.as_str()] {
+            if let Some(&id) = vocab.get(part) {
+                if y.tokenizer.token_types[id as usize] != TokenType::Normal {
+                    let shown: String = part.chars().take(64).collect();
+                    return Err(TokenizerError::Build {
+                        reason: format!("merge references non-Normal token \"{shown}\""),
+                    });
+                }
+            }
+            // a missing part falls through to the BPE builder's own
+            // merge validation, which refuses it by name
         }
     }
 

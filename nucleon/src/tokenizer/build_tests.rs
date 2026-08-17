@@ -93,6 +93,57 @@ fn mismatched_type_array_refuses() {
 }
 
 #[test]
+fn byte_level_char_matches_the_crate_alphabet() {
+    // byte_level_char is a hand-port of GPT-2's bytes_to_unicode;
+    // the crate exposes the real thing. Pin set equality so a drift
+    // in our port (or a crate bump changing the mapping) fails here
+    // instead of silently letting the two border checks verify the
+    // wrong 256 characters.
+    use std::collections::HashSet;
+    use tokenizers::pre_tokenizers::byte_level::ByteLevel;
+    let ours: HashSet<char> = (0..=255u8)
+        .map(crate::loader::yamf::byte_level_char)
+        .collect();
+    let theirs: HashSet<char> = ByteLevel::alphabet().into_iter().collect();
+    assert_eq!(ours, theirs);
+}
+
+#[test]
+fn non_normal_alphabet_entry_refuses() {
+    // presence is not enough: an alphabet entry typed Control would
+    // register as an added token and match whole ahead of BPE,
+    // corrupting every word containing that byte
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    let pos = yamf.tokenizer.tokens.iter().position(|t| t == "z").unwrap();
+    yamf.tokenizer.token_types[pos] = crate::loader::yamf::TokenType::Control;
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("non-Normal alphabet entry must refuse")
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("not Normal-typed"), "{msg}");
+}
+
+#[test]
+fn non_normal_merge_reference_refuses() {
+    // a merge operand typed non-Normal becomes an added token; the
+    // piece it names can never form and the merge silently dies
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    // "ab" is the product of merge "a b"; type it UserDefined
+    let pos = yamf
+        .tokenizer
+        .tokens
+        .iter()
+        .position(|t| t == "ab")
+        .unwrap();
+    yamf.tokenizer.token_types[pos] = crate::loader::yamf::TokenType::UserDefined;
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("non-Normal merge product must refuse")
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("non-Normal"), "{msg}");
+}
+
+#[test]
 fn incomplete_byte_alphabet_refuses() {
     // the worst silent-corruption case: with no unk token, a
     // character missing from the vocab is DROPPED at encode and its

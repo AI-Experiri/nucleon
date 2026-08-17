@@ -329,8 +329,9 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
     // ByteLevel::alphabet); if any is missing, ordinary bytes cannot
     // be encoded at all. Each base token must ALSO be typed Normal
     // so the tokenizer treats it as a plain byte, not a special.
-    // tokenizers has no re-export for the alphabet, so we build it
-    // the same way (see byte_level_char).
+    // byte_level_char is our port of the mapping; the tokenizer's
+    // tests pin it set-equal to the crate's own ByteLevel::alphabet()
+    // so a drift (ours or a crate bump's) fails loudly.
     let vocab_index: std::collections::HashMap<&str, usize> = tokens
         .iter()
         .enumerate()

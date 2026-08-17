@@ -12,8 +12,9 @@ the engine's learning time goes to kernels, not to rebuilding BPE
 `from_yamf(&Yamf)` assembles an in-memory tokenizer from the
 fields the loader already validated — vocab + merges into a BPE
 model, the qwen2 regex + byte-level stage as pre-tokenizer,
-byte-level decoder, every Control/UserDefined token registered so
-specials match whole (one id, never a BPE decomposition).
+byte-level decoder, every Control/UserDefined/Unknown token
+registered so specials match whole (one id, never a BPE
+decomposition).
 
 Runtime surface, all specials-safe by construction (the two HF
 booleans are hard-wired false and hidden):
