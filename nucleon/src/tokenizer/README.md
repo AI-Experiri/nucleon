@@ -23,7 +23,9 @@ booleans are hard-wired false and hidden):
 - `decode(&[u32]) -> String` — keeps markers.
 - `stream_decoder() -> DecodeStream` — per-generation UTF-8
   buffering; `step(id)` yields `None` until a codepoint completes,
-  so a split emoji never prints U+FFFD.
+  so a split emoji never prints U+FFFD. End every stream with
+  `finish()`: it drains a tail truncated mid-codepoint (lossily,
+  visible U+FFFD) that would otherwise vanish.
 - `stop_token_ids() -> &[u32]` — the loader's stop set, verbatim.
 
 ## How to read it

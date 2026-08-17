@@ -93,6 +93,23 @@ pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
             ),
         });
     }
+    // and the worst silent-corruption case: BPE here has no unk
+    // token, so a character missing from the vocab is DROPPED at
+    // encode and its neighbors merge across the hole ("acb" with no
+    // "c" encodes like "ab"). The byte-level alphabet is what makes
+    // every input encodable; verify all 256 entries at this border,
+    // not just in the GGUF gate.
+    for b in 0..=255u8 {
+        let ch = crate::loader::yamf::byte_level_char(b);
+        let s: String = std::iter::once(ch).collect();
+        if !vocab.contains_key(&s) {
+            return Err(TokenizerError::Build {
+                reason: format!(
+                    "byte-level alphabet incomplete: byte 0x{b:02X} (char {ch:?}) has no vocab entry"
+                ),
+            });
+        }
+    }
 
     // part 4, merge side: file order preserved, so index = rank
     let merges: Vec<(String, String)> = y.tokenizer.merges.clone();
@@ -123,9 +140,12 @@ pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError> {
     let pre_regex = match y.tokenizer.pre.as_str() {
         "qwen2" => QWEN2_PRE,
         other => {
+            // truncate the echo: pre is caller-supplied and could be
+            // arbitrarily long (same discipline as the loader's echo())
+            let shown: String = other.chars().take(64).collect();
             return Err(TokenizerError::Build {
-                reason: format!("pre-tokenizer id \"{other}\"; this build supports: qwen2"),
-            })
+                reason: format!("pre-tokenizer id \"{shown}\"; this build supports: qwen2"),
+            });
         }
     };
     let split = Split::new(

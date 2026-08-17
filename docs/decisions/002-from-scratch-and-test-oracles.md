@@ -28,3 +28,8 @@ Date: 2026-08-14. Status: accepted.
 Production nucleon stays pure Rust with zero ML dependencies; candle
 appears only in test builds. If fuzz-vs-candle and the golden test
 disagree, transformers is the tie-breaker.
+
+> Amended twice since: ADR 005 moved compute to MLX via mlx-rs
+> (FFI allowed), and ADR 006 made HF `tokenizers` a production
+> dependency. The oracle stance (candle dev-only, transformers as
+> tie-breaker) is unchanged.

@@ -30,9 +30,12 @@ impl Tokenizer {
                 ),
             });
         }
+        // encode_fast skips the offset/word-id tracking the full
+        // encode computes; we only keep the ids, so that work is
+        // pure waste on every prompt
         let encoding = self
             .inner
-            .encode(text, false)
+            .encode_fast(text, false)
             .map_err(TokenizerError::encode)?;
         Ok(encoding.get_ids().to_vec())
     }

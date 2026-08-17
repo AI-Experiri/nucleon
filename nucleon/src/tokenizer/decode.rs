@@ -15,7 +15,9 @@ use crate::tokenizer::error::TokenizerError;
 
 /// Part 6: wraps the HF `DecodeStream`, which buffers bytes until
 /// they form a whole UTF-8 codepoint. One per generation; borrow
-/// ties it to its tokenizer.
+/// ties it to its tokenizer. must_use: dropping the stream without
+/// calling `finish` loses a tail truncated mid-codepoint.
+#[must_use = "call finish() when generation ends, or a truncated tail is lost"]
 pub struct DecodeStream<'t> {
     tokenizer: &'t Tokenizer,
     inner: tokenizers::tokenizer::DecodeStream<

@@ -1,9 +1,10 @@
 //! `TokenizerError` — the three ways the tokenizer can fail.
 //!
 //! Same shape as `LoaderError`: each variant carries the reason,
-//! Display is written by hand. Build failures are load-time bugs
-//! (the loader already validated the inputs, so a build failure
-//! means our construction is wrong, not the file); encode/decode
+//! Display is written by hand. Build covers both rejected inputs
+//! (Yamf's fields are public, so from_yamf re-validates its border:
+//! pre id, parallel arrays, duplicates, byte alphabet) and genuine
+//! construction failures inside the HF crate; encode/decode
 //! failures are runtime.
 
 use std::fmt;

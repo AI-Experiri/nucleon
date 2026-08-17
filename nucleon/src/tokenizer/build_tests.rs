@@ -93,6 +93,37 @@ fn mismatched_type_array_refuses() {
 }
 
 #[test]
+fn incomplete_byte_alphabet_refuses() {
+    // the worst silent-corruption case: with no unk token, a
+    // character missing from the vocab is DROPPED at encode and its
+    // neighbors merge across the hole. from_yamf re-checks all 256
+    // alphabet entries at its border.
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    // remove the alphabet entry for byte 'z' (printable, maps to
+    // itself, not referenced by any merge or named token)
+    let pos = yamf.tokenizer.tokens.iter().position(|t| t == "z").unwrap();
+    yamf.tokenizer.tokens.remove(pos);
+    yamf.tokenizer.token_types.remove(pos);
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("incomplete alphabet must refuse")
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("alphabet"), "{msg}");
+}
+
+#[test]
+fn oversized_pre_id_echo_is_truncated() {
+    // the refusal echoes an untrusted field; it must not embed a
+    // multi-megabyte string in the error message
+    let mut yamf = load_bytes(&mini().build()).unwrap();
+    yamf.tokenizer.pre = "x".repeat(1_000_000);
+    let Err(err) = from_yamf(&yamf) else {
+        panic!("unknown pre id must refuse")
+    };
+    assert!(err.to_string().len() < 300, "echoed too much");
+}
+
+#[test]
 fn duplicate_token_refuses() {
     // same public-fields hazard as the short-type-array case: a
     // duplicate string silently shadows the earlier id in the vocab

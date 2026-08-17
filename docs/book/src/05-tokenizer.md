@@ -246,9 +246,14 @@ Parts 1-4 in action on a two-word prompt:
 <div class="diagram"><img src="diagrams/tokenizer-encode.svg" alt="text through pre-tokenizer, byte-level mapping, BPE merges, then ids"></div>
 
 Our `encode` wraps the HF call and hides the boolean —
-`tokenizer.encode(text, /*add_specials=*/ false)` — so callers
+`tokenizer.encode_fast(text, /*add_specials=*/ false)` — so callers
 cannot accidentally turn special-sprinkling back on (8.6's second
-rule).
+rule). One defensive bound: inputs over 512 KiB are refused. The
+regex backend's backtracking limit trips silently at about a
+million whitespace characters — the crate swallows the error and
+the whole input becomes one unsplit piece, wrong ids with no
+failure — so `encode` refuses loudly long before that point (the
+model's whole context window is about 160 KB of text).
 
 Two encoding cases the tests pin explicitly:
 
@@ -279,12 +284,25 @@ then `stream.step(id) -> Result<Option<String>, _>` — `None` while
 buffering, `Some(chunk)` when a valid piece emerges. The generation
 loop calls this in the sample-then-print inner loop.
 
+One case `step` alone cannot handle: generation that ENDS while
+bytes are still buffered — a max-token stop landing mid-emoji. The
+HF stream has no flush, so those bytes would vanish silently. Our
+wrapper tracks the ids fed since the last emitted chunk and adds
+`finish()`: called when generation ends, it decodes whatever is
+still buffered, lossily (a truncated codepoint prints as U+FFFD —
+visible truncation, never silent loss), or returns `None` if the
+stream ended clean. The loop's contract: every `stream_decoder()`
+ends with a `finish()`.
+
 ## 8.10 The API
 
 ```rust
 pub struct Tokenizer {
     inner: tokenizers::Tokenizer,     // HF crate, wrapped: parts 1-5
     stops: Vec<u32>,                  // part 7, pass-through
+    vocab_len: usize,                 // tokens.len() at build; the
+                                      // crate's get_vocab_size clones
+                                      // the whole vocab per call
 }
 
 pub fn from_yamf(y: &Yamf) -> Result<Tokenizer, TokenizerError>;
@@ -295,6 +313,11 @@ impl Tokenizer {
     pub fn stream_decoder(&self) -> DecodeStream;   // part 6, on demand
     pub fn stop_token_ids(&self) -> &[u32];
     pub fn vocab_size(&self) -> usize;
+}
+
+impl DecodeStream<'_> {
+    pub fn step(&mut self, id: u32) -> Result<Option<String>, TokenizerError>;
+    pub fn finish(self) -> Result<Option<String>, TokenizerError>;  // drain the tail
 }
 ```
 
@@ -323,12 +346,12 @@ these seven rows executed top to bottom.
 
 | # | part | crate item | how it is wired |
 |---|---|---|---|
-| 1 | added-token scan | `AddedToken` | one per Control/UserDefined vocab entry, registered with `add_special_tokens(&[AddedToken])`; the scan itself runs inside `encode` |
+| 1 | added-token scan | `AddedToken` | one per Control/UserDefined/Unknown vocab entry, registered with `add_special_tokens(&[AddedToken])`; the scan itself runs inside `encode` |
 | 2 | pre-tokenizer | `pre_tokenizers::split::Split` | `Split::new(SplitPattern::Regex(QWEN2), SplitDelimiterBehavior::Isolated, false)`, chained before the ByteLevel stage with `pre_tokenizers::sequence::Sequence`, attached via `with_pre_tokenizer` |
 | 3 | byte-level alphabet | `pre_tokenizers::byte_level::ByteLevel` | `add_prefix_space=false`, `trim_offsets=false`, `use_regex=false` (the regex already ran in Split); second stage of the same Sequence |
 | 4 | BPE model | `models::bpe::BpeBuilder` | `BpeBuilder::default().vocab_and_merges(vocab, merges).build()` — no unk token, no byte fallback; the model the tokenizer is constructed around |
 | 5 | decoder | `decoders::byte_level::ByteLevel` | the same ByteLevel type in its decoder role, attached via `with_decoder` |
-| 6 | UTF-8 buffering | `DecodeStream` | `decode_stream(false)` on the built tokenizer; `step(id)` returns `Ok(None)` while buffering, `Ok(Some(chunk))` on a complete codepoint |
+| 6 | UTF-8 buffering | `DecodeStream` | `decode_stream(false)` on the built tokenizer; `step(id)` returns `Ok(None)` while buffering, `Ok(Some(chunk))` on a complete codepoint; our wrapper adds `finish()` (the HF stream has no flush) |
 | 7 | stop set | — | no crate concept; a `Vec<u32>` field on our wrapper, returned by `stop_token_ids()` |
 | — | NFC normalization | `normalizers::unicode::NFC` | pinned in `from_yamf` (GGUF has no normalizer field; the reference tokenizer.json requires it), attached via `with_normalizer` before the added tokens |
 
@@ -336,7 +359,7 @@ The two runtime paths in crate terms:
 
 | our call | crate call | the boolean that matters |
 |---|---|---|
-| `encode(text)` | `encode(text, false)` then `Encoding::get_ids()` | `add_special_tokens=false` — the never-adds rule from 8.6 |
+| `encode(text)` | `encode_fast(text, false)` then `Encoding::get_ids()` | `add_special_tokens=false` — the never-adds rule from 8.6 |
 | `decode(ids)` | `decode(ids, false)` | `skip_special_tokens=false` — markers survive round-trips |
 | `stream_decoder()` | `decode_stream(false)` | same skip flag, same reason |
 

@@ -792,7 +792,9 @@ pub fn load_bytes(bytes: &[u8]) -> Result<Yamf, LoaderError> {
 /// bytes_to_unicode): printable bytes map to themselves, and the
 /// remaining ~68 bytes get sequential characters starting at 256.
 /// Ported from tokenizers' pre_tokenizers::byte_level::bytes_char.
-fn byte_level_char(b: u8) -> char {
+/// Crate-visible: the tokenizer's from_yamf re-checks the alphabet
+/// at its own border (Yamf fields are public).
+pub(crate) fn byte_level_char(b: u8) -> char {
     fn printable(b: u8) -> bool {
         let x = b as u32;
         (0x21..=0x7E).contains(&x) || (0xA1..=0xAC).contains(&x) || (0xAE..=0xFF).contains(&x)
