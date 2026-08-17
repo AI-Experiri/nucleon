@@ -13,10 +13,23 @@ Everything below is the qwen3 architecture as
 [modeling_qwen3.py](https://github.com/huggingface/transformers/blob/main/src/transformers/models/qwen3/modeling_qwen3.py)
 defines it (the modeling code outranks papers — [Reading the
 Model](03-reading-the-model.md), 6.3), sized by the config numbers
-the loader read. The family paper is the
-[Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) — the
-sizes we support, the training story, and the differences from
-Qwen2. Implement the family once and every checkpoint size runs on
+the loader read.
+
+The family paper is the
+[Qwen3 Technical Report](https://arxiv.org/abs/2505.09388) — and
+it is honest to say that the paper's contributions live OUTSIDE
+this chapter: a unified thinking-mode / non-thinking-mode model
+in one checkpoint, a thinking budget for adaptive compute at
+inference, and a strong-to-weak distillation pipeline that lets
+smaller sizes inherit from the flagship. **Architecturally, Qwen3
+is a standard modern transformer** — every technique in this
+chapter was published between 2016 and 2023, and 9.1's papers
+table names each one. Qwen3's contribution is the *combination*
+plus a training story, not a new block. The behavioral pieces
+show up in nucleon elsewhere: the tokenizer chapter registers the
+`<think>` tokens the thinking-mode template emits; the sampler
+chapter will handle thinking budgets. Here, we just implement
+the forward pass — once — and every checkpoint size runs on
 config numbers alone.
 
 ## 9.1 The parts
@@ -57,8 +70,8 @@ That is the complete inventory: 2 global tensors + 11 per block ×
 The sections below explain each part, simplest first: the numbers
 that size everything (9.2), the embedding and the tied head (9.3),
 the residual stream (9.4), RMSNorm (9.5), the SwiGLU MLP (9.6),
-RoPE (9.7), and attention with Qwen3's two signatures — grouped
-queries and QK-norm (9.8). Then the block assembled (9.9), the
+RoPE (9.7), and attention with the two departures from the
+textbook shape — GQA and QK-norm (9.8). Then the block assembled (9.9), the
 whole pass in MLX calls (9.10), and the module layout (9.11).
 
 ## 9.2 The numbers
@@ -206,7 +219,7 @@ uses:
 | base (theta) | 1,000,000 — from `rope.freq_base`, not the classic 10,000 |
 | scaling | none (`rope.scaling.*` keys absent; the gate would refuse them) |
 
-## 9.8 Attention, with Qwen3's two signatures
+## 9.8 Attention: two departures from the canonical shape
 
 The part everything else exists to feed, in the shape Vaswani et
 al. introduced in
@@ -222,9 +235,12 @@ the model may not read the future it is trying to predict.
 
 <div class="diagram"><img src="diagrams/qwen3-attention.svg" alt="x projected to Q, K, V; per-head QK-norm; RoPE; grouped-query SDPA with causal mask; output projection"></div>
 
-The two things that make this *Qwen3's* attention and not the
-textbook version — the diagram below draws both sides at the same
-scale so the differences are shapes on the page, not just numbers:
+Two things depart from the pure Vaswani shape. Neither was
+invented for Qwen3 — **GQA came from Ainslie 2023 and QK-norm
+from Henry 2020** — they are the two knobs Qwen3-0.6B turned
+that Qwen2 did not. The diagram below draws both sides at the
+same scale so the differences are shapes on the page, not just
+numbers:
 
 <div class="diagram"><img src="diagrams/qwen3-attn-signatures.svg" alt="canonical MHA (16 Q heads × 64, 16 KV heads × 64, no QK-norm) side-by-side with Qwen3 (16 Q heads × 128 wider than hidden, 8 KV heads × 128 halved by GQA, QK-norm on Q and K)"></div>
 

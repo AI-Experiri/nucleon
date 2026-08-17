@@ -5,7 +5,7 @@
     </marker>
   </defs>
 
-  <text x="410" y="24" text-anchor="middle" font-size="14" fill="#c0cadb">How Qwen3's two signatures reshape the canonical attention</text>
+  <text x="410" y="24" text-anchor="middle" font-size="14" fill="#c0cadb">Qwen3's two departures from the canonical attention shape</text>
   <text x="410" y="42" text-anchor="middle" font-size="11" fill="#8b98a9" opacity="0.85">shapes drawn to scale — 1 head_dim unit = 0.2 px, so widths ARE the numbers</text>
 
   <!-- LEFT PANEL: canonical MHA -->
@@ -116,41 +116,64 @@
   <rect x="780" y="187" width="30" height="20" rx="4" fill="rgba(224,164,88,0.20)" stroke="#e0a458" stroke-opacity="0.8"/>
   <text x="795" y="201" text-anchor="middle" font-size="10" fill="#e0a458">QK</text>
 
-  <!-- Panel R K row: 8 heads × 128 -->
-  <text x="365" y="236" font-size="11" fill="#c0cadb">K &#183; 8 heads × 128 = 1024   (GQA: KV heads halved)</text>
-  <g fill="rgba(70,130,180,0.35)" stroke="#4682b4" stroke-opacity="0.7">
-    <rect x="365"   y="244" width="24.6" height="26" rx="2"/>
-    <rect x="390.6" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="416.2" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="441.8" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="467.4" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="493.0" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="518.6" y="244" width="24.6" height="26" rx="2"/>
-    <rect x="544.2" y="244" width="24.6" height="26" rx="2"/>
+  <!-- Panel R: GQA pairing lines — each of the 16 Q heads connects to its shared K head. -->
+  <!-- Green tint so the sharing is visually distinct from box outlines; 8 V-shapes total. -->
+  <g fill="none" stroke="#9dc49d" stroke-opacity="0.75" stroke-width="1.4">
+    <path d="M 377.3 210 L 390.1 244"/>
+    <path d="M 402.9 210 L 390.1 244"/>
+    <path d="M 428.5 210 L 441.3 244"/>
+    <path d="M 454.1 210 L 441.3 244"/>
+    <path d="M 479.7 210 L 492.5 244"/>
+    <path d="M 505.3 210 L 492.5 244"/>
+    <path d="M 530.9 210 L 543.7 244"/>
+    <path d="M 556.5 210 L 543.7 244"/>
+    <path d="M 582.1 210 L 594.9 244"/>
+    <path d="M 607.7 210 L 594.9 244"/>
+    <path d="M 633.3 210 L 646.1 244"/>
+    <path d="M 658.9 210 L 646.1 244"/>
+    <path d="M 684.5 210 L 697.3 244"/>
+    <path d="M 710.1 210 L 697.3 244"/>
+    <path d="M 735.7 210 L 748.5 244"/>
+    <path d="M 761.3 210 L 748.5 244"/>
   </g>
-  <rect x="580" y="247" width="30" height="20" rx="4" fill="rgba(224,164,88,0.20)" stroke="#e0a458" stroke-opacity="0.8"/>
-  <text x="595" y="261" text-anchor="middle" font-size="10" fill="#e0a458">QK</text>
+  <!-- one small text hint anchored to the last V, so the pairing meaning is spelled out -->
+  <text x="770" y="230" font-size="10" fill="#9dc49d">2 Q heads → 1 KV head</text>
 
-  <!-- Panel R V row: 8 heads × 128 -->
-  <text x="365" y="296" font-size="11" fill="#c0cadb">V &#183; 8 heads × 128 = 1024   (no norm, no RoPE)</text>
+  <!-- Panel R K row: 8 heads × 128, SPREAD so each K sits at the midpoint of its Q pair -->
+  <text x="365" y="236" font-size="11" fill="#c0cadb">K &#183; 8 heads × 128 = 1024   (each K shared by 2 Q heads — GQA)</text>
   <g fill="rgba(70,130,180,0.35)" stroke="#4682b4" stroke-opacity="0.7">
-    <rect x="365"   y="304" width="24.6" height="26" rx="2"/>
-    <rect x="390.6" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="416.2" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="441.8" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="467.4" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="493.0" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="518.6" y="304" width="24.6" height="26" rx="2"/>
-    <rect x="544.2" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="377.8" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="429.0" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="480.2" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="531.4" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="582.6" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="633.8" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="685.0" y="244" width="24.6" height="26" rx="2"/>
+    <rect x="736.2" y="244" width="24.6" height="26" rx="2"/>
+  </g>
+  <rect x="780" y="247" width="30" height="20" rx="4" fill="rgba(224,164,88,0.20)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="795" y="261" text-anchor="middle" font-size="10" fill="#e0a458">QK</text>
+
+  <!-- Panel R V row: 8 heads × 128, same spread positions as K -->
+  <text x="365" y="296" font-size="11" fill="#c0cadb">V &#183; 8 heads × 128 = 1024   (same pairing as K; no norm, no RoPE)</text>
+  <g fill="rgba(70,130,180,0.35)" stroke="#4682b4" stroke-opacity="0.7">
+    <rect x="377.8" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="429.0" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="480.2" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="531.4" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="582.6" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="633.8" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="685.0" y="304" width="24.6" height="26" rx="2"/>
+    <rect x="736.2" y="304" width="24.6" height="26" rx="2"/>
   </g>
 
   <!-- Signature callouts below the panels -->
-  <text x="20" y="392" font-size="12" fill="#9dc49d">signature 1 — GQA (Ainslie 2023)</text>
+  <text x="20" y="392" font-size="12" fill="#9dc49d">departure 1 — GQA (Ainslie 2023)</text>
   <text x="20" y="412" font-size="11" fill="#8b98a9">16 Q heads share 8 KV heads: each KV head serves 2 Q heads.</text>
   <text x="20" y="428" font-size="11" fill="#8b98a9">The cache chapter's KV storage is per past position × KV heads;</text>
   <text x="20" y="444" font-size="11" fill="#8b98a9">halving KV heads halves that cost. Quality cost of sharing is small.</text>
 
-  <text x="20" y="480" font-size="12" fill="#9dc49d">signature 2 — QK-norm (Henry 2020)</text>
+  <text x="20" y="480" font-size="12" fill="#9dc49d">departure 2 — QK-norm (Henry 2020)</text>
   <text x="20" y="500" font-size="11" fill="#8b98a9">A [128] RMSNorm applied per head, shared across every head of its kind:</text>
   <text x="20" y="516" font-size="11" fill="#8b98a9">one attn_q_norm across all 16 Q heads; one attn_k_norm across all 8 K.</text>
   <text x="20" y="532" font-size="11" fill="#8b98a9">Qwen2 had NO norms inside attention; Qwen3's addition keeps QK dot</text>
