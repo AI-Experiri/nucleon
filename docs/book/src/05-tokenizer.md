@@ -202,7 +202,14 @@ references vocab entries that exist and are `Normal`; the tokenizer
 model is `"gpt2"` and the pre id is `"qwen2"` — anything else was
 refused by name; the three Control specials present and referenced
 correctly by `eos_token_id`; `add_bos_token`/`add_eos_token` false
-or absent. So the construction trusts its inputs completely.
+or absent. So for loader-produced bundles the checks below can never fire.
+But `Yamf`'s fields are public — a hand-built bundle skips the gate
+— so `from_yamf` re-validates its own border and refuses rather
+than build a silently-corrupting tokenizer: parallel tokens/types
+arrays, no duplicate token strings, the full 256-character byte
+alphabet present and Normal-typed, merge operands and products
+Normal-typed, and a pre id it has a regex for. These are not
+redundant with the loader's gate; they are the module's own door.
 
 The construction uses Hugging Face's `tokenizers` crate
 (default-features off, `fancy-regex` on, per 8.5):
@@ -345,7 +352,7 @@ these seven rows executed top to bottom.
 
 | # | part | crate item | how it is wired |
 |---|---|---|---|
-| 1 | added-token scan | `AddedToken` | one per Control/UserDefined/Unknown vocab entry, registered with `add_special_tokens(&[AddedToken])`; the scan itself runs inside `encode` |
+| 1 | added-token scan | `AddedToken` | one per Control/UserDefined/Unknown vocab entry, registered with `add_special_tokens(tokens)` (takes any iterator of owned `AddedToken`s); the scan itself runs inside `encode` |
 | 2 | pre-tokenizer | `pre_tokenizers::split::Split` | `Split::new(SplitPattern::Regex(QWEN2), SplitDelimiterBehavior::Isolated, false)`, chained before the ByteLevel stage with `pre_tokenizers::sequence::Sequence`, attached via `with_pre_tokenizer` |
 | 3 | byte-level alphabet | `pre_tokenizers::byte_level::ByteLevel` | `add_prefix_space=false`, `trim_offsets=false`, `use_regex=false` (the regex already ran in Split); second stage of the same Sequence |
 | 4 | BPE model | `models::bpe::BpeBuilder` | `BpeBuilder::default().vocab_and_merges(vocab, merges).build()` — no unk token, no byte fallback; the model the tokenizer is constructed around |

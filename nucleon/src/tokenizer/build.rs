@@ -1,8 +1,13 @@
 //! `from_yamf` — Yamf pieces to an in-memory HF tokenizer.
 //!
 //! Book chapter 8.7: every part is built from a field the loader
-//! already validated, so this file trusts its inputs completely.
-//! The crate items used here are the table in chapter 8.11.
+//! already validated — but Yamf's fields are public, so a
+//! hand-built bundle can skip the gate. from_yamf therefore
+//! re-validates its own border (parallel arrays, duplicates, byte
+//! alphabet present and Normal-typed, merge references Normal, pre
+//! id known) and refuses rather than build a silently-corrupting
+//! tokenizer. These checks are the module's own door, not
+//! redundancy. The crate items used here are the table in 8.11.
 
 use tokenizers::models::bpe::{BpeBuilder, Vocab};
 use tokenizers::normalizers::unicode::NFC;
