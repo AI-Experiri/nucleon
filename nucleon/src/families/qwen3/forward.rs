@@ -86,26 +86,16 @@ impl Qwen3 {
             let k = ops::matmul(&xn, &attn_k_t).map_err(layer_err)?;
             let v = ops::matmul(&xn, &attn_v_t).map_err(layer_err)?;
 
-            // Split heads: [seq, rows] -> [seq, n_heads, head_dim]
-            let q = q.reshape(&[seq, n_heads, head_dim]).map_err(layer_err)?;
-            let k = k.reshape(&[seq, n_kv_heads, head_dim]).map_err(layer_err)?;
-            let v = v.reshape(&[seq, n_kv_heads, head_dim]).map_err(layer_err)?;
-
-            // QK-norm per head (RMSNorm normalizes on the last axis,
-            // broadcasting the [head_dim] weight across seq and heads).
-            let q = fast::rms_norm(&q, &block.attn_q_norm, eps).map_err(layer_err)?;
-            let k = fast::rms_norm(&k, &block.attn_k_norm, eps).map_err(layer_err)?;
-
-            // RoPE. offset=0 because the naive loop hands us the whole
-            // prompt each call; the cache chapter will pass positions.
-            let q = fast::rope(&q, head_dim, false, Some(rope_base), 1.0f32, 0, None)
-                .map_err(layer_err)?;
-            let k = fast::rope(&k, head_dim, false, Some(rope_base), 1.0f32, 0, None)
-                .map_err(layer_err)?;
-
-            // SDPA wants rank 4 [batch, n_heads, seq, head_dim]; we
-            // run single-batch. Add a leading batch dim while
-            // transposing seq and heads.
+            // Reshape and transpose to attention layout [1, H, seq, D]
+            // BEFORE norm/rope. MLX's fast::rope flattens all leading
+            // dims and treats axis 1 of the result as the sequence
+            // axis (fast.cpp:401 `flatten(x, 0, ndim - 3)` →
+            // `x.shape(1)` becomes positions). Applying rope to the
+            // natural post-projection [seq, H, D] would rotate the
+            // HEADS axis as if it were sequence positions — silent
+            // wrong logits. Ordering here matches HF's
+            // modeling_qwen3.py exactly: reshape → transpose(1,2) →
+            // q_norm → rope → sdpa.
             let q = q
                 .reshape(&[1, seq, n_heads, head_dim])
                 .map_err(layer_err)?
@@ -120,6 +110,21 @@ impl Qwen3 {
                 .reshape(&[1, seq, n_kv_heads, head_dim])
                 .map_err(layer_err)?
                 .transpose_axes(&[0, 2, 1, 3])
+                .map_err(layer_err)?;
+
+            // QK-norm per head (RMSNorm normalizes on the last axis,
+            // broadcasting the [head_dim] weight across batch, heads,
+            // and seq).
+            let q = fast::rms_norm(&q, &block.attn_q_norm, eps).map_err(layer_err)?;
+            let k = fast::rms_norm(&k, &block.attn_k_norm, eps).map_err(layer_err)?;
+
+            // RoPE. offset=0 because the naive loop hands us the whole
+            // prompt each call; the cache chapter will pass positions.
+            // Input is [1, H, seq, D]; MLX flattens [1, H] → [H] and
+            // rotates along axis 1 (which is now seq). Correct.
+            let q = fast::rope(&q, head_dim, false, Some(rope_base), 1.0f32, 0, None)
+                .map_err(layer_err)?;
+            let k = fast::rope(&k, head_dim, false, Some(rope_base), 1.0f32, 0, None)
                 .map_err(layer_err)?;
 
             // MLX's SDPA handles GQA when n_heads is an integer

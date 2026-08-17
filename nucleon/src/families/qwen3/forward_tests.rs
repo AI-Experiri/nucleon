@@ -91,6 +91,52 @@ fn logits_are_finite() {
     }
 }
 
+#[test]
+fn rope_actually_rotates_along_seq_axis() {
+    // Revert-proof for the RoPE axis bug caught in round 9.
+    //
+    // MLX's fast::rope treats axis 1 (after flattening leading dims)
+    // as the sequence axis (fast.cpp:401,407). Correct wiring is
+    // [1, H, seq, D] BEFORE rope; the previous (wrong) wiring was
+    // [seq, H, D] which made MLX rotate the heads axis as if it were
+    // positions.
+    //
+    // The mini fixture's constant attn_v/output weights collapse V
+    // rows to identical values, which erases most RoPE-through-V
+    // effects on the final logits (see comment below). BUT: with the
+    // right axis order, differences in position-DEPENDENT rotations
+    // survive at least as small numerical variations in logits when
+    // rope_theta changes. With the WRONG axis (rotating heads), the
+    // rotation is entirely position-independent, so changing theta
+    // has literally no observable effect on any output value.
+    //
+    // So: pick two extreme theta values, run forward on a >1-token
+    // prompt, and require at least ONE logit to differ. Under the
+    // bug, all logits are byte-identical (rope_theta consumed only
+    // for a heads-axis rotation whose effect cancels through the
+    // uniform V). Under the fix, some differ (however small).
+    let _cpu = CpuScope::new();
+
+    let a = from_yamf(&load_bytes(&mini().build()).unwrap()).unwrap();
+
+    let mut yamf_b = load_bytes(&mini().build()).unwrap();
+    let crate::loader::FamilyConfig::Qwen3(cfg) = &mut yamf_b.family;
+    cfg.rope_theta = 100.0;
+    let b = from_yamf(&yamf_b).unwrap();
+
+    let ids = vec![1u32, 5u32, 3u32];
+    let la = a.forward(&ids).unwrap();
+    let lb = b.forward(&ids).unwrap();
+    let sa = la.as_slice::<f32>();
+    let sb = lb.as_slice::<f32>();
+    assert_eq!(sa.len(), sb.len());
+    let any_diff = sa.iter().zip(sb.iter()).any(|(x, y)| (x - y).abs() > 0.0);
+    assert!(
+        any_diff,
+        "logits byte-identical between rope_theta=1e6 and rope_theta=100 — RoPE is rotating the wrong axis (see round-9 bug)"
+    );
+}
+
 // COVERAGE GAP acknowledged (finding B, review round 1):
 //
 // The value-correctness of the wiring — RoPE traditional=false,
