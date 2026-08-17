@@ -40,17 +40,17 @@ and the specials behind the added-token scan (8.6). Then assembly
 from `Yamf` (8.7), the two runtime paths end to end (8.8, 8.9),
 and the API (8.10).
 
-## 8.2 Part 7: the stop set
+## 8.2 The stop set
 
-The simplest part — it is not even logic, just a value passed
-through. The loader assembled `stop_token_ids` for us (7.3
+The simplest part (7 in the diagram) — it is not even logic, just
+a value passed through. The loader assembled `stop_token_ids` for us (7.3
 landmine 2: `eos_token_id` alone under-reports; `<|endoftext|>`
 must be added by string lookup). The tokenizer stores it and
 returns it verbatim: `Tokenizer::stop_token_ids() -> &[u32]`.
 Comparing each sampled id against this set — and stopping — is
 the generation loop's job, not ours.
 
-## 8.3 Part 3: the byte-level alphabet
+## 8.3 The byte-level alphabet
 
 **Byte-level** means the base alphabet is exactly 256 characters —
 one per possible byte — so any input string can encode. Nothing is
@@ -63,7 +63,7 @@ all 256 are in the vocab). One mapping worth memorizing: byte
 `Ġ` — that is why a leading-space word shows up as `Ġworld` in
 every BPE vocab dump you will ever read.
 
-## 8.4 Part 4: the BPE model
+## 8.4 The BPE model
 
 BPE (byte-pair encoding) merges the most frequent adjacent pair of
 tokens into a new token, over and over, until the vocab is full. At
@@ -82,7 +82,7 @@ carries in `Yamf`:
   one earlier in this list wins. The loader kept file order, so
   rank is index — no sorting, no extra bookkeeping.
 
-## 8.5 Part 2: the pre-tokenizer regex
+## 8.5 The pre-tokenizer regex
 
 Before BPE runs, the raw string is split into pieces, and merges
 never cross piece boundaries. Which regex does the splitting is a
@@ -123,7 +123,7 @@ Two Rust-specific notes:
   "esaxx_fast"]`; `onig` binds the C library Oniguruma. Depend on it
   with `default-features = false, features = ["fancy-regex"]`.
 
-## 8.6 Part 1: special tokens and the added-token scan
+## 8.6 Special tokens and the added-token scan
 
 A **special token** is a vocabulary entry whose string form is a
 marker the model was trained to recognize as structure, not as
@@ -310,30 +310,38 @@ Module layout, one concern per file:
 | tokenizer/decode.rs | full decode + `stream_decoder` |
 | tokenizer/error.rs | `TokenizerError` |
 
-## 8.11 What the tests will pin
+## 8.11 The parts, in crate terms
 
-All on the real Qwen3 tokenizer data the loader gives us (loaded
-from a tiny GGUF fixture, same builder pattern as the loader
-tests):
+Everything this chapter taught maps onto a named item in the
+`tokenizers` crate. This table is the whole build: `from_yamf` is
+these seven rows executed top to bottom.
 
-1. round-trip on ASCII: `encode` then `decode` returns the input;
-2. round-trip on latin-1 (accented letters): same;
-3. round-trip on emoji: a four-byte emoji encodes and decodes back;
-4. **emoji split across tokens streams correctly** — the failure
-   this whole chapter exists to prevent: feed each id one at a
-   time through `stream_decoder`, concatenate emitted chunks,
-   must equal the original string with no `U+FFFD`;
-5. `<|im_start|>` encodes to exactly one id (added-token, not BPE);
-6. encode of a bare prompt does NOT contain the eos or endoftext id
-   (never adds specials, no matter what);
-7. `stop_token_ids()` returns the exact set the loader assembled;
-8. round-trip on the full ChatML-wrapped prompt the chat template
-   would produce for `[{role: user, content: "Why is the sky blue?"}]`
-   preserves every marker as a single id.
+| # | part | crate item | how it is wired |
+|---|---|---|---|
+| 1 | added-token scan | `AddedToken` | one per Control/UserDefined vocab entry, registered with `add_special_tokens(&[AddedToken])`; the scan itself runs inside `encode` |
+| 2 | pre-tokenizer | `pre_tokenizers::split::Split` | `Split::new(SplitPattern::Regex(QWEN2), SplitDelimiterBehavior::Isolated, false)`, chained before the ByteLevel stage with `pre_tokenizers::sequence::Sequence`, attached via `with_pre_tokenizer` |
+| 3 | byte-level alphabet | `pre_tokenizers::byte_level::ByteLevel` | `add_prefix_space=false`, `trim_offsets=false`, `use_regex=false` (the regex already ran in Split); second stage of the same Sequence |
+| 4 | BPE model | `models::bpe::BpeBuilder` | `BpeBuilder::default().vocab_and_merges(vocab, merges).build()` — no unk token, no byte fallback; the model the tokenizer is constructed around |
+| 5 | decoder | `decoders::byte_level::ByteLevel` | the same ByteLevel type in its decoder role, attached via `with_decoder` |
+| 6 | UTF-8 buffering | `DecodeStream` | `decode_stream(false)` on the built tokenizer; `step(id)` returns `Ok(None)` while buffering, `Ok(Some(chunk))` on a complete codepoint |
+| 7 | stop set | — | no crate concept; a `Vec<u32>` field on our wrapper, returned by `stop_token_ids()` |
 
-The golden test that proves the whole encode/decode path against HF
-transformers lives in the loop chapter, not here — it's an
-end-to-end test, and the tokenizer is one thing it checks.
+The two runtime paths in crate terms:
+
+| our call | crate call | the boolean that matters |
+|---|---|---|
+| `encode(text)` | `encode(text, false)` then `Encoding::get_ids()` | `add_special_tokens=false` — the never-adds rule from 8.6 |
+| `decode(ids)` | `decode(ids, false)` | `skip_special_tokens=false` — markers survive round-trips |
+| `stream_decoder()` | `decode_stream(false)` | same skip flag, same reason |
+
+What the crate does NOT do for us — exactly the code we still own:
+the stop set pass-through (part 7), the two booleans above always
+being `false` (our wrapper hides them so no caller can flip one),
+and the `from_yamf` construction itself. That is the entire
+tokenizer module: glue around a well-tested crate, with the engine
+time saved for the kernels where it matters. The end-to-end proof
+that our reconstruction matches Hugging Face's own — same text,
+same ids — is the golden test in the loop chapter.
 
 ## 8.12 Upcoming tokenizer topics
 
