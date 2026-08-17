@@ -188,7 +188,7 @@ Where each rule is enforced:
 
 | the rule | enforced where |
 |---|---|
-| `<\|im_start\|>` encodes as one id, not seven | the reconstruction registers every Control/UserDefined vocab entry as an added token (8.7) |
+| `<\|im_start\|>` encodes as one id, not seven | the reconstruction registers every Control/UserDefined/Unknown vocab entry as an added token (8.7) |
 | encode does not sprinkle BOS/EOS | our `encode()` passes `add_special_tokens=false` (8.8) |
 | add_bos_token / add_eos_token are false in the file | the loader refuses any file that sets them true (7.7) |
 | the ChatML wrapping is correct | the loader's render smoke test in the gate (7.7) checked both roles and both markers in order on a real render |
@@ -214,7 +214,7 @@ The construction uses Hugging Face's `tokenizers` crate
 | `tokens` (151936 entries) | 4. BPE model (vocab side) | `BpeBuilder::vocab_and_merges` |
 | `merges` | 4. BPE model (merge side) | same builder; index = rank |
 | `pre` (`"qwen2"`) | 2. pre-tokenizer | selects the regex constant |
-| `token_types` (Control/UserDefined) | 1. added-token scan | `AddedToken` registration |
+| `token_types` (Control/UserDefined/Unknown) | 1. added-token scan | `AddedToken` registration |
 | `tokens` again | 3. alphabet + 5. decoder | `ByteLevel` pre-tokenizer stage and `ByteLevel` decoder |
 | `stop_token_ids` | 7. stop set | stored on our wrapper, untouched |
 
@@ -255,15 +255,14 @@ the whole input becomes one unsplit piece, wrong ids with no
 failure — so `encode` refuses loudly long before that point (the
 model's whole context window is about 160 KB of text).
 
-Two encoding cases the tests pin explicitly:
-
-1. Raw text that ends inside a UTF-8 codepoint: byte-level BPE
-   handles it because every byte has a token, but the boundary
-   still needs care on decode (8.9).
-2. A ChatML-wrapped prompt containing `<|im_start|>user\n...`: the
-   `<|im_start|>` must encode as one id (its added-token id 151644),
-   not as the BPE decomposition of the literal string. This is the
-   "one id, not seven" case from 8.6, in a test.
+The encoding case the tests pin explicitly: a ChatML-wrapped
+prompt containing `<|im_start|>user\n...` must keep every marker
+as one id (the added-token id 151644), never the BPE decomposition
+of the literal string — the "one id, not seven" case from 8.6, in
+a test. (Split codepoints are a decode-side concern: encode input
+is a Rust `&str`, which is always whole UTF-8 by construction; the
+splitting happens when the MODEL emits token ids, which is 8.9's
+problem.)
 
 ## 8.9 Streaming decode without broken UTF-8
 
