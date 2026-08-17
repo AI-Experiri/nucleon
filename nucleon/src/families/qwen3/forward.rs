@@ -35,6 +35,18 @@ impl Qwen3 {
         }
 
         let cfg = &self.cfg;
+        // Bound-check every id here: MLX's gather does no bounds
+        // check (it reads src_ptr directly from the CPU backend's
+        // inner loop), so an out-of-range id silently returns
+        // garbage logits — or worse, reads OOB memory. Today's
+        // tokenizer cannot produce >= vocab_size (its vocab_len
+        // pin), but a hand-fed loop could; refuse at our door.
+        let vocab = cfg.vocab_size;
+        if let Some((pos, &bad)) = ids.iter().enumerate().find(|(_, &i)| i >= vocab) {
+            return Err(FamilyError::Forward {
+                reason: format!("id {bad} at position {pos} is >= vocab_size {vocab}"),
+            });
+        }
         let seq = ids.len() as i32;
         let head_dim = cfg.head_dim as i32;
         let n_heads = cfg.num_attention_heads as i32;

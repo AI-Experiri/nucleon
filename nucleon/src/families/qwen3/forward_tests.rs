@@ -64,6 +64,19 @@ fn empty_ids_refuses() {
 }
 
 #[test]
+fn out_of_range_id_refuses() {
+    // MLX's gather does no bounds check — an out-of-range id
+    // would silently produce garbage logits or read OOB memory.
+    // Forward's own check catches it at the door.
+    let _cpu = CpuScope::new();
+    let m = model();
+    let vocab = m.config().vocab_size;
+    let err = m.forward(&[vocab]).unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("vocab_size"), "{msg}");
+}
+
+#[test]
 fn logits_are_finite() {
     // A generated garbage prompt from the mini fixture must still
     // produce all-finite logits; NaN/inf here would mean a norm or
