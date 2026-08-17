@@ -1,0 +1,63 @@
+<svg width="720" height="420" viewBox="0 0 720 420" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#8b98a9">
+  <defs>
+    <marker id="arrS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#8b98a9" opacity="0.8"/>
+    </marker>
+  </defs>
+
+  <text x="360" y="30" text-anchor="middle" fill="#c0cadb" font-size="14">encode("&lt;|im_start|&gt;")   —  same input, two very different outputs</text>
+
+  <!-- Left column: without registration -->
+  <text x="180" y="66" text-anchor="middle" fill="#cc5555" font-size="13">without added-token registration</text>
+
+  <rect x="30" y="82" width="300" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="180" y="103" text-anchor="middle" font-size="12" fill="#c0cadb">"&lt;|im_start|&gt;"     (9 characters of text)</text>
+
+  <path d="M 180 118 v 14" stroke="#cc5555" stroke-opacity="0.7" fill="none" marker-end="url(#arrS)"/>
+  <text x="240" y="130" font-size="11" opacity="0.75">plain BPE</text>
+
+  <rect x="30" y="140" width="300" height="60" rx="8" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="180" y="162" text-anchor="middle" font-size="12" fill="#f0c893">byte-level chars broken up:</text>
+  <text x="180" y="182" text-anchor="middle" font-size="12" fill="#f0c893">["&lt;", "|", "im", "_", "start", "|", "&gt;"]</text>
+
+  <path d="M 180 204 v 14" stroke="#cc5555" stroke-opacity="0.7" fill="none" marker-end="url(#arrS)"/>
+  <text x="240" y="216" font-size="11" opacity="0.75">vocab lookup</text>
+
+  <rect x="30" y="226" width="300" height="60" rx="8" fill="rgba(204,85,85,0.10)" stroke="#cc5555" stroke-opacity="0.7"/>
+  <text x="180" y="248" text-anchor="middle" font-size="12" fill="#cc5555">ids: [27, 91, 318, 62, 2468, 91, 29]</text>
+  <text x="180" y="268" text-anchor="middle" font-size="12" fill="#cc5555">7 ids, none of them 151644</text>
+
+  <rect x="30" y="300" width="300" height="80" rx="10" fill="rgba(204,85,85,0.08)" stroke="#cc5555" stroke-opacity="0.6" stroke-dasharray="4 3"/>
+  <text x="180" y="322" text-anchor="middle" font-size="11" opacity="0.85">the model was trained expecting</text>
+  <text x="180" y="340" text-anchor="middle" font-size="11" opacity="0.85">id 151644 at this position.</text>
+  <text x="180" y="358" text-anchor="middle" font-size="11" opacity="0.85">a decomposition is ordinary text</text>
+  <text x="180" y="374" text-anchor="middle" font-size="11" opacity="0.85">that happens to look like a marker.</text>
+
+  <!-- Right column: with registration -->
+  <text x="540" y="66" text-anchor="middle" fill="#9dc49d" font-size="13">with added-token registration (what we do)</text>
+
+  <rect x="390" y="82" width="300" height="34" rx="8" fill="rgba(70,130,180,0.10)" stroke="#4682b4" stroke-opacity="0.7"/>
+  <text x="540" y="103" text-anchor="middle" font-size="12" fill="#c0cadb">"&lt;|im_start|&gt;"     (same 9 characters)</text>
+
+  <path d="M 540 118 v 14" stroke="#5e8d5e" stroke-opacity="0.7" fill="none" marker-end="url(#arrS)"/>
+  <text x="600" y="130" font-size="11" opacity="0.75">added-token match first</text>
+
+  <rect x="390" y="140" width="300" height="60" rx="8" fill="rgba(224,164,88,0.10)" stroke="#e0a458" stroke-opacity="0.8"/>
+  <text x="540" y="162" text-anchor="middle" font-size="12" fill="#f0c893">matched as ONE piece:</text>
+  <text x="540" y="182" text-anchor="middle" font-size="12" fill="#f0c893">["&lt;|im_start|&gt;"]     (BPE skipped)</text>
+
+  <path d="M 540 204 v 14" stroke="#5e8d5e" stroke-opacity="0.7" fill="none" marker-end="url(#arrS)"/>
+  <text x="600" y="216" font-size="11" opacity="0.75">vocab lookup</text>
+
+  <rect x="390" y="226" width="300" height="60" rx="8" fill="rgba(94,141,94,0.10)" stroke="#5e8d5e" stroke-opacity="0.7"/>
+  <text x="540" y="248" text-anchor="middle" font-size="12" fill="#9dc49d">ids: [151644]</text>
+  <text x="540" y="268" text-anchor="middle" font-size="12" fill="#9dc49d">one id — the one the model was trained on</text>
+
+  <rect x="390" y="300" width="300" height="80" rx="10" fill="rgba(94,141,94,0.08)" stroke="#5e8d5e" stroke-opacity="0.6" stroke-dasharray="4 3"/>
+  <text x="540" y="322" text-anchor="middle" font-size="11" opacity="0.85">every vocab entry whose token_type is</text>
+  <text x="540" y="340" text-anchor="middle" font-size="11" opacity="0.85">Control or UserDefined gets registered</text>
+  <text x="540" y="358" text-anchor="middle" font-size="11" opacity="0.85">as an added token at build time; the</text>
+  <text x="540" y="374" text-anchor="middle" font-size="11" opacity="0.85">tokenizer checks these before running BPE.</text>
+
+  <text x="360" y="410" text-anchor="middle" font-size="11" opacity="0.6">The concrete ids above are Qwen3's real vocab positions — see 8.5's table.</text>
+</svg>

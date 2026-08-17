@@ -39,8 +39,11 @@ in-memory tokenizer from it.
 BPE (byte-pair encoding) merges the most frequent adjacent pair of
 tokens into a new token, over and over, until the vocab is full. At
 encode time, the same merges run in the same order, greedily. The
-theory is taught interactively in the LLM Lab; this chapter only
-teaches the pieces specific to what nucleon actually builds.
+full walkthrough with visualizations and every tokenizer variant
+(BPE, WordPiece, SentencePiece, byte-level) sits in the
+[LLM Lab tokenizing chapter](https://llm-lab.bicepjai.com/llm-tokenizing/);
+read that first if the algorithm is new. This chapter only teaches
+the pieces specific to what nucleon actually builds.
 
 Two properties that matter for the code:
 
@@ -86,12 +89,8 @@ The three tokenizer layers we assemble:
 3. **Decoder** — `ByteLevel` with the same flags, so the inverse
    mapping recovers the original bytes.
 
-Added tokens: every entry in `tokens` whose `token_type` is `Control`
-or `UserDefined` becomes an `AddedToken` registered with the
-tokenizer, so BPE never splits them. This includes at least
-`<|im_start|>`, `<|im_end|>`, `<|endoftext|>` — plus, when the file
-has them, `<tool_call>`, `<think>`, and friends the ChatML template
-may emit under tools/thinking modes.
+Added tokens are covered in 8.5 (the one thing the reconstruction
+does that needs its own section).
 
 ## 8.4 The pre-tokenizer regex
 
@@ -127,30 +126,94 @@ Two Rust-specific notes:
   "esaxx_fast"]`; `onig` binds the C library Oniguruma. Depend on
   it with `default-features = false, features = ["fancy-regex"]`.
 
-## 8.5 Encode: never adds specials
+## 8.5 Special tokens
 
-The critical rule, restated from the loader chapter's landmine:
-**the tokenizer never adds BOS, EOS, or any other special token on
-encode.** The chat template owns them and inserts them into the
-string before the tokenizer sees it. If the tokenizer also inserted
-them, we would double every one.
+A **special token** is a vocabulary entry whose string form is a
+marker the model was trained to recognize as structure, not as
+literal text. Qwen3 has three that matter now, four more that show
+up under tools/thinking modes, and a `token_type` on each so the
+tokenizer knows how to treat them:
 
-In tokenizers crate terms: `tokenizer.encode(text, /*add_specials=*/
-false)`. Our `encode` wraps that and hides the boolean.
+| id | string | token_type | what it means |
+|---|---|---|---|
+| 151643 | `<\|endoftext\|>` | Control | end of the whole generation (stop the loop) |
+| 151644 | `<\|im_start\|>` | Control | ChatML: a message begins |
+| 151645 | `<\|im_end\|>` | Control | ChatML: this message ended (also stops decode of assistant turn) |
+| 151657 | `<tool_call>` | UserDefined | tools mode: model requests a tool call |
+| 151658 | `</tool_call>` | UserDefined | tools mode: end of the request |
+| 151667 | `<think>` | UserDefined | thinking mode: model's private scratch space starts |
+| 151668 | `</think>` | UserDefined | thinking mode: end of scratch |
+
+Two things about specials that trip everyone up. Both are shown
+side by side in the diagram below.
+
+**They must encode as ONE id.** The string `<|im_start|>` is nine
+characters. If we hand it to plain BPE without telling the tokenizer
+about it, BPE splits it into whatever byte-level merges cover
+`<`, `|`, `im`, `_`, `start`, `|`, `>` — several ids, none of them
+151644. The model was trained expecting id 151644, so a decomposed
+form is *not the same input* — it's ordinary text that happens to
+look like the marker. Registering the string as an "added token"
+makes the tokenizer match it whole and emit exactly one id.
+
+<div class="diagram"><img src="diagrams/tokenizer-specials.svg" alt="unregistered specials become BPE decomposition; registered specials encode to one id"></div>
+
+**Encode does not add them for us.** The tokenizers crate has a
+convenience where `encode(text, add_special_tokens=true)` sprinkles
+BOS at the start / EOS at the end automatically. We turn that OFF:
+`encode(text, add_special_tokens=false)`. Why: the **chat template**
+already built the specials into the string. If the tokenizer also
+inserted them, every one doubles. Qwen3 explicitly does not want a
+BOS at all; `add_bos_token=false` in the metadata (the loader gates
+on it). Concrete example:
+
+```text
+one turn of chat, before the tokenizer sees anything:
+
+  messages = [{"role": "user", "content": "Why is the sky blue?"}]
+
+the chat template renders that to a plain string:
+
+  <|im_start|>user\nWhy is the sky blue?<|im_end|>\n<|im_start|>assistant\n
+
+that string is what encode() gets. Every <|im_start|>, <|im_end|>
+in it is one id (added-token match); the rest goes through byte-level
+BPE like any other prose.
+```
+
+If the tokenizer added its OWN BOS on top of this, the model would
+see `<|im_start|><|im_start|>user...` — two openers, one from us and
+one from the template, and the model was never trained on that.
+
+Where each rule is enforced:
+
+| the rule | enforced where |
+|---|---|
+| `<\|im_start\|>` encodes as one id, not seven | the reconstruction registers every Control/UserDefined vocab entry as an added token (8.3) |
+| encode does not sprinkle BOS/EOS | our `encode()` passes `add_special_tokens=false` (8.6) |
+| add_bos_token / add_eos_token are false in the file | the loader refuses any file that sets them true (7.7) |
+| the ChatML wrapping is correct | the loader's render smoke test in the gate (7.7) checked both roles and both markers in order on a real render |
+
+## 8.6 Encode: never adds specials
+
+The rule restated in code terms (see 8.5 for why):
+`tokenizer.encode(text, /*add_specials=*/ false)`. Our `encode`
+wraps that and hides the boolean, so callers cannot accidentally
+turn specials back on.
 
 <div class="diagram"><img src="diagrams/tokenizer-encode.svg" alt="text through pre-tokenizer, byte-level mapping, BPE merges, then ids"></div>
 
-Two encoding cases the tests will pin explicitly:
+Two encoding cases the tests pin explicitly:
 
 1. Raw text that ends inside a UTF-8 codepoint: byte-level BPE
    handles it because every byte has a token, but the boundary
-   still needs care on decode (8.6).
+   still needs care on decode (8.7).
 2. A ChatML-wrapped prompt containing `<|im_start|>user\n...`: the
-   `<|im_start|>` must encode as a single id (its added-token id),
-   not as the BPE decomposition of the literal string. Added-token
-   registration is what makes this work.
+   `<|im_start|>` must encode as one id (its added-token id 151644),
+   not as the BPE decomposition of the literal string. This is the
+   "one id, not seven" case from 8.5, in a test.
 
-## 8.6 Streaming decode without broken UTF-8
+## 8.7 Streaming decode without broken UTF-8
 
 Generation emits one token id per step. If we decode each id in
 isolation and print, a multi-byte codepoint (an emoji, a CJK
@@ -169,7 +232,7 @@ then `stream.step(id) -> Result<Option<String>, _>` — `None` while
 buffering, `Some(chunk)` when a valid piece emerges. The generation
 loop calls this in the sample-then-print inner loop.
 
-## 8.7 The stop set, passed through
+## 8.8 The stop set, passed through
 
 The loader assembled `stop_token_ids` for us (7.3 landmine 2:
 `eos_token_id` alone under-reports; `<|endoftext|>` must be added).
@@ -178,7 +241,7 @@ through — `Tokenizer::stop_token_ids() -> &[u32]` returns exactly
 what `Yamf.tokenizer.stop_token_ids` contained. Stopping is the
 loop's job.
 
-## 8.8 The API
+## 8.9 The API
 
 ```rust
 pub struct Tokenizer {
@@ -214,7 +277,7 @@ Module layout, one concern per file:
 | tokenizer/decode.rs | full decode + `stream_decoder` |
 | tokenizer/error.rs | `TokenizerError` |
 
-## 8.9 What the tests will pin
+## 8.10 What the tests will pin
 
 All on the real Qwen3 tokenizer data the loader gives us (loaded
 from a tiny GGUF fixture, same builder pattern as the loader
@@ -239,7 +302,7 @@ The golden test that proves the whole encode/decode path against HF
 transformers lives in the loop chapter, not here — it's an
 end-to-end test, and the tokenizer is one thing it checks.
 
-## 8.10 Upcoming tokenizer topics
+## 8.11 Upcoming tokenizer topics
 
 Visible from here, scheduled later:
 
