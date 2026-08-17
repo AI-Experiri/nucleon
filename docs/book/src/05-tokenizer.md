@@ -44,7 +44,7 @@ and the API (8.10).
 
 The simplest part (7 in the diagram) — it is not even logic, just
 a value passed through. The loader assembled `stop_token_ids` for us (7.3
-landmine 2: `eos_token_id` alone under-reports; `<|endoftext|>`
+case 2: `eos_token_id` alone under-reports; `<|endoftext|>`
 must be added by string lookup). The tokenizer stores it and
 returns it verbatim: `Tokenizer::stop_token_ids() -> &[u32]`.
 Comparing each sampled id against this set — and stopping — is

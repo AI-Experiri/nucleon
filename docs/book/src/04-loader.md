@@ -118,7 +118,7 @@ The rest of the metadata feeds later blocks: the tokenizer arrays
 [The Tokenizer](05-tokenizer.md)) and a 4100-character ChatML chat
 template string ([The CLI](10-cli.md)).
 
-Two landmines flagged now because each costs a debugging day later:
+Two silent-corruption cases flagged now because each costs a debugging day later:
 
 1. `tokenizer.ggml.bos_token_id` exists (151643) while
    `tokenizer.ggml.add_bos_token` is false. Qwen3 never prepends BOS;
@@ -308,7 +308,7 @@ Each piece, what it is for, and where the idea was stolen from:
 |---|---|---|---|
 | `family` | the ONE family-specific corner: a tag (which family) wrapping that family's typed numbers (`Qwen3Config`: u32 layer count, f32 epsilon). Everything else in Yamf is family-agnostic | the family's forward pass | GGUF's architecture tag (a tag namespaces the rest) becomes the enum tag; GGUF's typed metadata becomes compiler-checked fields |
 | `tensors` | all 310 weights as f32 `Tensor`s, dims un-reversed, shapes already checked | the forward pass | safetensors' up-front inventory: the full tensor list is verified complete before this struct can exist |
-| `tokenizer` | tokens, merges, token types, the pre id, and the stop set the gate assembled (151645 and 151643; 7.3 landmine 2), as plain vectors | The Tokenizer chapter, the stop set by The Loop | GGUF's bundle idea: the tokenizer travels with the weights, nothing external needed |
+| `tokenizer` | tokens, merges, token types, the pre id, and the stop set the gate assembled (151645 and 151643; 7.3 case 2), as plain vectors | The Tokenizer chapter, the stop set by The Loop | GGUF's bundle idea: the tokenizer travels with the weights, nothing external needed |
 | `tokenizer.pre` | "qwen2", the tag naming which split regex to build | the tokenizer build | GGUF's architecture-tag pattern: a small tag tells you how to read the rest |
 | `chat_template` | the ChatML template, parsed and validated at the gate: `ChatTemplate` wraps a [minijinja](https://docs.rs/minijinja) environment holding the compiled template (minijinja is the established pure-Rust Jinja engine, by Jinja's original author). A broken template fails at load, not at first chat | the chat module (the CLI calls it later) | GGUF's bundle again, plus the gate philosophy: validate everything the moment it enters |
 | the struct as a whole | inert: no file handles, no logic; IO is fully over when `load` returns. Nothing from the file ever runs as code; the chat template is parsed into a sandboxed description at the gate, which is validation, not execution | everything downstream | safetensors' dumbness-as-a-virtue, plus two rejections: ONNX's program-carrying (family code is our program) and pickle's executability |

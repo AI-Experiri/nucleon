@@ -93,7 +93,7 @@
   <text x="467" y="145" text-anchor="middle" font-size="11" fill="#e0a458" opacity="0.85">hidden = 1024 (unchanged)</text>
 
   <!-- Panel R Q row: 16 heads × 128 → 16 boxes, 24.6 px wide -->
-  <text x="365" y="176" font-size="11" fill="#c0cadb">Q &#183; 16 heads × 128 = 2048   ← WIDER than hidden (the head_dim landmine)</text>
+  <text x="365" y="176" font-size="11" fill="#c0cadb">Q &#183; 16 heads × 128 = 2048   ← WIDER than hidden (head_dim = 128 explicit, not 1024/16)</text>
   <g fill="rgba(70,130,180,0.35)" stroke="#4682b4" stroke-opacity="0.7">
     <rect x="365"   y="184" width="24.6" height="26" rx="2"/>
     <rect x="390.6" y="184" width="24.6" height="26" rx="2"/>
@@ -185,6 +185,6 @@
 
   <!-- Landmine warning (red — used elsewhere in the book for wrong-path callouts) -->
   <text x="410" y="568" text-anchor="middle" font-size="11" fill="#cc5555" opacity="0.9">
-    the head_dim = 128 landmine: computing 1024/16 = 64 fits every weight, then generates garbage
+    if you compute head_dim as 1024 / 16 = 64 instead of reading 128 from the config, every weight fits and the output is garbage
   </text>
 </svg>

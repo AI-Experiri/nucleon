@@ -90,8 +90,8 @@ loader read (chapter 7's `Qwen3Config`). For Qwen3-0.6B:
 | `rope.freq_base` | 1000000 | RoPE's rotation base (9.7) |
 | `context_length` | 40960 | max positions the model was trained for |
 
-The landmine from 6.3, now with consequences: `head_dim` is 128
-**explicitly**, while `hidden / heads = 1024 / 16 = 64`. Qwen3's
+The silent-corruption case from 6.3, now with consequences:
+`head_dim` is 128 **explicitly**, while `hidden / heads = 1024 / 16 = 64`. Qwen3's
 attention is WIDER than its residual stream: 16 heads × 128 = 2048
 values of query per position, projected back down to 1024 on the
 way out. Compute `head_dim` instead of reading it and every weight
@@ -264,8 +264,8 @@ one k_norm weight. This is Qwen3's addition over Qwen2 (which
 normed nothing inside attention): it keeps query·key dot products
 in a bounded range so softmax never saturates, which is what lets
 the family train stably at large sizes. Skip it and the weights
-still fit — and the output is garbage, the same silent failure
-class as the head_dim landmine.
+still fit — and the output is garbage, the same silent-corruption
+class as the `head_dim` case in 9.2.
 
 The full sub-block, shapes annotated:
 
