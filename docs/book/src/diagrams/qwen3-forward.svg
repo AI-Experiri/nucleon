@@ -39,7 +39,7 @@
   <!-- fan out from x: down-left to col 1's norm, down-right to col 2 (via x_mid path later) -->
   <path d="M 400 216 L 400 226 L 200 226 L 200 240" fill="none" stroke="#8b98a9" stroke-opacity="0.7" marker-end="url(#arrHead)"/>
 
-  <!-- ---------- COLUMN 1: attention sub-block ---------- -->
+  <!--  COLUMN 1: attention sub-block  -->
   <text x="200" y="234" text-anchor="middle" font-size="12" fill="#9dc49d">attention sub-block (parts 2 + 3)</text>
 
   <!-- part 2: RMSNorm attn_norm -->
@@ -68,11 +68,11 @@
         fill="none" stroke="#e0a458" stroke-opacity="0.6" stroke-dasharray="4 3" marker-end="url(#arrResHead)"/>
   <text x="106" y="320" font-size="10" fill="#e0a458" opacity="0.9" transform="rotate(-90 106 320)">residual (x)</text>
 
-  <!-- ---------- flow between columns: x_mid ---------- -->
+  <!--  flow between columns: x_mid  -->
   <path d="M 213 408 L 587 408" fill="none" stroke="#8b98a9" stroke-opacity="0.75" marker-end="url(#arrHead)"/>
   <text x="400" y="401" text-anchor="middle" font-size="11" fill="#8b98a9" opacity="0.85">x_mid = x + attention(RMSNorm(x))</text>
 
-  <!-- ---------- COLUMN 2: MLP sub-block ---------- -->
+  <!--  COLUMN 2: MLP sub-block  -->
   <text x="600" y="234" text-anchor="middle" font-size="12" fill="#9dc49d">MLP sub-block (parts 2 + 4)</text>
 
   <!-- feed column 2 norm from x_mid: tap up from the horizontal bar -->
