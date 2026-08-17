@@ -159,9 +159,9 @@ to hold in your head, connected by types too dumb to leak complexity.
 | 8 | tokenizer | encoding, and streaming decode without broken UTF-8 |
 | 9 | families/qwen3 | the full transformer forward pass |
 | 10 | generate | the loop with no cache: correct first, measured slow |
-| 11 | cache | KV storage as the first measured improvement |
-| 12 | sampler | greedy, temperature, top-k, top-p |
-| 13 | cli/chat | the ChatML template and the command line |
+| 11 | sampler | greedy, temperature, top-k, top-p |
+| 12 | cli/chat | the ChatML template and the command line |
+| 13 | cache | KV storage as the first Part III improvement |
 | 14 | fast kernels | tuning matmul and attention toward llama.cpp |
 | 15 | gguf/quant | more quant types and fused dequant |
 | 16 | qwen3.8 | the qwen3_5 hybrid: Gated DeltaNet and a second cache |
