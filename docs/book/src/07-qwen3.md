@@ -233,8 +233,6 @@ more weight); the output is the weighted sum of values. Positions
 after the current one are excluded — the **causal mask** — because
 the model may not read the future it is trying to predict.
 
-<div class="diagram"><img src="diagrams/qwen3-attention.svg" alt="x projected to Q, K, V; per-head QK-norm; RoPE; grouped-query SDPA with causal mask; output projection"></div>
-
 Two things depart from the pure Vaswani shape. Neither was
 invented for Qwen3 — **GQA came from Ainslie 2023 and QK-norm
 from Henry 2020** — they are the two knobs Qwen3-0.6B turned
