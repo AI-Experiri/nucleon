@@ -223,7 +223,10 @@ the model may not read the future it is trying to predict.
 <div class="diagram"><img src="diagrams/qwen3-attention.svg" alt="x projected to Q, K, V; per-head QK-norm; RoPE; grouped-query SDPA with causal mask; output projection"></div>
 
 The two things that make this *Qwen3's* attention and not the
-textbook version:
+textbook version — the diagram below draws both sides at the same
+scale so the differences are shapes on the page, not just numbers:
+
+<div class="diagram"><img src="diagrams/qwen3-attn-signatures.svg" alt="canonical MHA (16 Q heads × 64, 16 KV heads × 64, no QK-norm) side-by-side with Qwen3 (16 Q heads × 128 wider than hidden, 8 KV heads × 128 halved by GQA, QK-norm on Q and K)"></div>
 
 **Grouped-query attention (GQA)** — Ainslie et al.,
 [GQA](https://arxiv.org/abs/2305.13245) (2023). 16 query heads but
