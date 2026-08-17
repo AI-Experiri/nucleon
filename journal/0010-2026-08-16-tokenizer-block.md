@@ -111,9 +111,51 @@ registration), "<unk>" type 2 (Unknown registration). Each ripple
 meant vocab-count updates in ~14 places; the counts are
 fixture-coupled by design (embd shape = [vocab, 32]).
 
-## State at close
+## Rounds 10-16 (continued 2026-08-17)
 
-103 tests, quality gate green, tokenizer files at 100% line
-coverage. Convergence counter: r8 clean, r9 found items → 0 again;
-next session resumes at round 10. Loader-wide coverage (84% lines,
-error.rs at 45%) remains a follow-up against the new 90% unit gate.
+- r10 (found 3): the alphabet border check verified presence but
+  not TYPE — a Control-typed alphabet byte registers as an added
+  token and hijacks every word containing it (confirmed against the
+  crate: "ab" -> [0,1] not [2]). Merge references got the same
+  type check. byte_level_char gained an oracle pin: set-equal to
+  the crate's own public ByteLevel::alphabet() — the old comment
+  claiming no such re-export was false.
+- r11 (0 code defects, 3 doc): the chapter claimed an encode test
+  that cannot exist (&str is always whole UTF-8); two tables
+  omitted Unknown; must_use comment overstated.
+- r12 (0 code defects, 2 doc): 8.7 still said "trusts its inputs
+  completely" while from_yamf carries five refusals — a maintainer
+  could read that as license to delete them; fixed. Wrong crate
+  signature in 8.11.
+- r13 (found 2, one REAL): reproduced a slice-index PANIC inside
+  BpeBuilder — it writes the concatenated merge pair into a buffer
+  sized to the longest vocab key BEFORE checking the product
+  exists (model.rs:264-270). A hand-built Yamf with a long absent
+  merge product aborts the process. Our border now refuses absent
+  operands/products (revert run reproduced the crate panic at
+  model.rs:267 exactly). Duplicate merges also refused: the
+  crate's merge map silently keeps the LAST rank.
+- r14 (0 code, 1 doc): border-check enumeration in three doc sites
+  was two refusals behind r13.
+- r15 (0 code, 1 doc): 8.6 implied 7 specials; the reference has
+  26 added tokens; counted honestly.
+- r16: CLEAN on code. Two minors applied: one regex-gloss word,
+  and vocab_size() pinned equal to get_vocab_size(true) so a
+  future non-vocab added token cannot silently under-report.
+
+## CONVERGED
+
+Rounds 14, 15, 16: three consecutive rounds with zero code
+defects (doc-only items). Per the CLAUDE.md policy that is
+convergence. Final state: 108 tests, quality gate green, tokenizer
+files at 100% line coverage, every code fix across 16 rounds
+revert-proof-verified. All reviewers were independent Opus
+subagents (codex out of credits until Aug 20); several
+independently downloaded the real Qwen3 tokenizer.json and
+diff-tested our construction against Tokenizer::from_file — 0 id
+mismatches across hundreds of adversarial texts and hundreds of
+thousands of fuzzed stream sequences.
+
+Follow-ups that remain OUTSIDE this block: loader-wide coverage vs
+the 90% gate; Part I chapter numbering drift flagged by r12; the
+research doc's missing NFC note.

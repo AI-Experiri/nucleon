@@ -13,6 +13,11 @@ fn builds_from_the_mini_model() {
     // the 254 alphabet extensions, four merges, three specials
     let t = tok();
     assert_eq!(t.vocab_size(), 269);
+    // the stored count's invariant, pinned against the crate: added
+    // tokens reuse vocab ids, so the sizes can never differ. If a
+    // future change registers a token NOT in tokens, this catches
+    // the silent under-report before a sampler sizes logits from it.
+    assert_eq!(t.vocab_size(), t.inner.get_vocab_size(true));
 }
 
 #[test]

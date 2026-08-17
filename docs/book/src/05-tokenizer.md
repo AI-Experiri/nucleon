@@ -109,7 +109,7 @@ Seven alternatives, first match wins at each position:
 | `[^\r\n\p{L}\p{N}]?\p{L}+` | a letter run, optionally led by one symbol | ` world`, `#hash` |
 | `\p{N}` | ONE digit at a time | `7`, then `6` in `76` |
 | ` ?[^\s\p{L}\p{N}]+[\r\n]*` | a symbol run, optional leading space | ` ->`, `!!!` |
-| `\s*[\r\n]+` | newlines with surrounding blank space | a paragraph break |
+| `\s*[\r\n]+` | newlines with leading blank space | a paragraph break |
 | `\s+(?!\S)` | whitespace NOT followed by non-space | trailing spaces at line end |
 | `\s+` | any remaining whitespace | the gap between pieces |
 
